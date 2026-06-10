@@ -340,6 +340,17 @@ function Tpl5({ c, img, pos, e }: { c: GraphicContent; img: string[] | null; pos
               ))}
             </div>
           </div>
+
+          {/* Testimonial pull quote */}
+          <div style={{ flex: 1, minHeight: 0, background: C.navy, borderRadius: 14, padding: '18px 20px', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 10 }}>
+            <div style={{ fontSize: 48, lineHeight: .7, color: C.gold, fontFamily: "'Playfair Display',serif", fontWeight: 800, opacity: .7 }}>"</div>
+            <Ed e={e} f="quote" multi tag="p" s={{ fontFamily: "'Playfair Display',serif", fontStyle: 'italic', fontSize: 17, lineHeight: 1.45, color: 'rgba(255,255,255,.9)', margin: 0, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 5, WebkitBoxOrient: 'vertical' }}>{c.quote}</Ed>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ width: 28, height: 2, background: C.gold, borderRadius: 2 }} />
+              <div style={{ fontSize: 13, fontWeight: 700, color: C.goldCta }}>– {c.proofName}</div>
+            </div>
+            <Stars size={16} />
+          </div>
         </div>
 
         {/* Right column */}
