@@ -4,7 +4,7 @@ import Icon from './ui/Icon';
 import Social from './ui/Social';
 import Btn from './ui/Btn';
 import GraphicCanvas, { TEMPLATES } from './graphic/GraphicCanvas';
-import { AUD, aiImageFor } from '@/lib/content';
+import { AUD } from '@/lib/content';
 import { useStore } from '@/store';
 import type { ContentPiece, ChannelId, ChatMessage, FiveLaw } from '@/types';
 
@@ -570,12 +570,25 @@ function RightPanel({ current, img, imgPos, onImgPos, onSetImg, onUpdate, onToas
                 <button className="rp-btn" onClick={() => fileRef.current?.click()}>
                   <Icon n="upload" size={14} /> Upload Photo
                 </button>
-                <button className="rp-btn" onClick={() => {
-                  const src = aiImageFor(current.imgKeywords || 'general', Date.now(), current.audience);
-                  onSetImg(src);
-                  onToast('Shuffled to a new wellness photo');
+                <button className="rp-btn" onClick={async () => {
+                  onToast('Generating a new AI image…');
+                  try {
+                    const res = await fetch('/api/generate-image', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ service: current.service, audience: current.audience }),
+                    });
+                    const json = await res.json();
+                    if (json.ok && json.dataUrl) {
+                      onSetImg(json.dataUrl);
+                      onImgPos({ x: 50, y: 35 });
+                      onToast('New AI image generated!');
+                    } else {
+                      onToast('Image generation failed — check OPENAI_API_KEY in Vercel');
+                    }
+                  } catch { onToast('Network error — try again'); }
                 }}>
-                  <Icon n="refresh" size={14} /> Shuffle
+                  <Icon n="refresh" size={14} /> Regenerate
                 </button>
                 {firstImg && (
                   <button className="rp-btn danger" onClick={() => onSetImg(null)}>

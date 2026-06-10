@@ -275,7 +275,7 @@ export function bakedGenerate(opts: GenerateOptions): Omit<ContentPiece, 'id' | 
   return {
     contentType: 'ig-post', service, audience, goal,
     template: ((opts as GenerateOptions & { template?: TemplateId }).template || 'educate') as TemplateId,
-    autoImage: aiImageFor(imgKeywords, seed, audience),
+    autoImage: null, // DALL-E 3 fills this in AppShell; no Unsplash fallback
     imgKeywords,
     graphic: {
       eyebrow, hook, emphasis, subhook, ctaShort: '(801) 784-0095',

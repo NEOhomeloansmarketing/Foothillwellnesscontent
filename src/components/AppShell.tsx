@@ -83,12 +83,14 @@ export default function AppShell() {
 
     await Promise.all([minWait, textPromise, imagePromise]);
 
-    // Use AI-generated image if we got one, otherwise Unsplash fallback
+    // Set image: user upload > DALL-E 3 > nothing (no Unsplash fallback)
     if (opts.userImage) {
       (content as { autoImage: string | string[] }).autoImage = opts.userImage;
     } else if (aiImageUrl) {
       (content as { autoImage: string }).autoImage = aiImageUrl;
     }
+    // If DALL-E didn't return (no API key configured), autoImage stays null —
+    // user can generate manually via the Image tab in the editor
 
     const audienceShort: Record<string, string> = { pain: 'Pain', healing: 'Recovery', weight: 'Weight', energy: 'Energy' };
     const proj: ContentPiece = {
