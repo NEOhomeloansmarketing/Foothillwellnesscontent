@@ -52,21 +52,22 @@ export async function POST(req: NextRequest) {
 
   try {
     const response = await openai.images.generate({
-      model: 'dall-e-3',
+      model: 'gpt-image-1',
       prompt: fullPrompt,
       n: 1,
       size: '1024x1024',
       quality: 'standard',
     });
 
+    const b64 = response.data?.[0]?.b64_json;
     const url = response.data?.[0]?.url;
-    const revisedPrompt = response.data?.[0]?.revised_prompt;
+    const imageData = b64 ? `data:image/png;base64,${b64}` : url;
 
-    if (!url) {
-      return NextResponse.json({ ok: false, error: 'No image returned from DALL-E' }, { status: 500 });
+    if (!imageData) {
+      return NextResponse.json({ ok: false, error: 'No image returned' }, { status: 500 });
     }
 
-    return NextResponse.json({ ok: true, dataUrl: url, revisedPrompt });
+    return NextResponse.json({ ok: true, dataUrl: imageData });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
     return NextResponse.json({ ok: false, error: msg }, { status: 500 });
