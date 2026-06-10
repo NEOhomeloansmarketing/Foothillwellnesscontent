@@ -210,10 +210,9 @@ function AIImagePanel({ service, audience, onGenerated, onClose }: {
 }
 
 // ─── Left panel: library + templates ───────────────────────────────────────────
-function LeftPanel({ projects, current, onSelect, onPick, img }: {
+function LeftPanel({ projects, current, onSelect, onPick }: {
   projects: ContentPiece[]; current: ContentPiece | null;
   onSelect: (p: ContentPiece) => void; onPick: (t: string) => void;
-  img: string | string[] | null;
 }) {
   const removeProject = useStore(s => s.removeProject);
   const addProject = useStore(s => s.addProject);
@@ -276,25 +275,6 @@ function LeftPanel({ projects, current, onSelect, onPick, img }: {
         ))}
       </div>
 
-      {/* Template selector */}
-      {current && (
-        <div className="ed-tpl-section">
-          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--gold-muted)', marginBottom: 10 }}>Layout</div>
-          <div className="ed-tpl-grid">
-            {TEMPLATES.map(t => (
-              <div key={t.id} className={`ed-tpl-item ${current.template === t.id ? 'on' : ''}`}
-                onClick={() => onSelect({ ...current, template: t.id })}>
-                <div className="ed-tpl-thumb">
-                  <div style={{ position: 'absolute', top: 0, left: 0, width: 1080, height: 1080, transform: 'scale(.052)', transformOrigin: 'top left', pointerEvents: 'none' }}>
-                    <GraphicCanvas tpl={t.id} content={current.graphic} img={img} />
-                  </div>
-                </div>
-                <div className="ed-tpl-name">{t.name}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -392,6 +372,31 @@ function CanvasPanel({ current, img, imgPos, onImgPos, onEditField, onUpdate, on
 
         <div style={{ fontSize: 11, color: 'var(--muted)', textAlign: 'center', marginTop: 8 }}>
           <Icon n="edit" size={12} /> <b style={{ color: 'var(--navy-mid)' }}>Click any text</b> to edit it directly on the canvas
+        </div>
+      </div>
+
+      {/* Template switcher — below canvas */}
+      <div style={{ padding: '14px 20px 0', borderTop: '1px solid var(--line-soft)', marginTop: 4 }}>
+        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--gold-muted)', marginBottom: 10 }}>Layout Template</div>
+        <div style={{ display: 'flex', gap: 10 }}>
+          {TEMPLATES.map(t => (
+            <button key={t.id}
+              onClick={() => onUpdate({ ...current, template: t.id })}
+              style={{
+                flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
+                padding: '10px 6px', borderRadius: 12, cursor: 'pointer', transition: '.15s',
+                background: current.template === t.id ? 'var(--navy-deep)' : 'var(--cream)',
+                border: current.template === t.id ? '2px solid var(--gold)' : '1.5px solid var(--line)',
+                color: current.template === t.id ? 'var(--gold-cta)' : 'var(--navy-mid)',
+              }}>
+              <div style={{ width: 72, height: 72, position: 'relative', borderRadius: 8, overflow: 'hidden', background: 'var(--line-soft)', flexShrink: 0 }}>
+                <div style={{ position: 'absolute', top: 0, left: 0, width: 1080, height: 1080, transform: 'scale(.0667)', transformOrigin: 'top left', pointerEvents: 'none' }}>
+                  <GraphicCanvas tpl={t.id} content={current.graphic} img={img} />
+                </div>
+              </div>
+              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.06em', textAlign: 'center' }}>{t.name}</div>
+            </button>
+          ))}
         </div>
       </div>
 
@@ -816,7 +821,6 @@ export default function Studio({ projects, current, generating, onSelect, onUpda
 
       <LeftPanel
         projects={projects} current={current} onSelect={p => { onSelect(p); onUpdate(p); }} onPick={onPick}
-        img={img}
       />
 
       <CanvasPanel
