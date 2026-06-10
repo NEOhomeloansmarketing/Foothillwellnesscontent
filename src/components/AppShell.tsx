@@ -46,35 +46,49 @@ export default function AppShell() {
     const usedProof = projects.filter(p => p.audience === opts.audience).map(p => p.proofUsed).filter(Boolean);
 
     if (usedHooks.length) {
-      setTimeout(() => showToast(`Steering away from ${usedHooks.length} past ${opts.service} angle${usedHooks.length > 1 ? 's' : ''} to keep it fresh`), 1200);
+      setTimeout(() => showToast(`Steering away from ${usedHooks.length} past hook${usedHooks.length > 1 ? 's' : ''} for ${opts.service}`), 1000);
     }
 
-    const minWait = new Promise(r => setTimeout(r, 4200));
+    const minWait = new Promise(r => setTimeout(r, 4800));
 
+    // Start baked content immediately
     let content = bakedGenerate({ ...opts, usedHooks, usedProof });
 
-    // Try live AI
-    try {
-      const res = await fetch('/api/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ service: opts.service, audience: opts.audience, goal: opts.goal, notes: opts.notes, usedHooks }),
-      });
-      const json = await res.json();
+    // Fire all 3 in parallel: AI text, AI image, min wait
+    let aiImageUrl: string | null = null;
+
+    const textPromise = fetch('/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ service: opts.service, audience: opts.audience, goal: opts.goal, notes: opts.notes, usedHooks }),
+    }).then(r => r.json()).then(json => {
       if (json.ok && json.data) {
         const d = json.data;
         content = {
           ...content,
           graphic: { ...content.graphic, hook: d.hook || content.graphic.hook, emphasis: d.emphasis || content.graphic.emphasis, subhook: d.subhook || content.graphic.subhook },
           caption: d.caption || content.caption,
-          hashtags: (d.hashtags?.length ? d.hashtags : content.hashtags),
+          hashtags: d.hashtags?.length ? d.hashtags : content.hashtags,
         };
       }
-    } catch {}
+    }).catch(() => {});
 
-    if (opts.userImage) { (content as any).autoImage = opts.userImage; (content as any).userImage = true; }
+    const imagePromise = opts.userImage ? Promise.resolve() : fetch('/api/generate-image', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ service: opts.service, audience: opts.audience }),
+    }).then(r => r.json()).then(json => {
+      if (json.ok && json.dataUrl) aiImageUrl = json.dataUrl;
+    }).catch(() => {});
 
-    await minWait;
+    await Promise.all([minWait, textPromise, imagePromise]);
+
+    // Use AI-generated image if we got one, otherwise Unsplash fallback
+    if (opts.userImage) {
+      (content as { autoImage: string | string[] }).autoImage = opts.userImage;
+    } else if (aiImageUrl) {
+      (content as { autoImage: string }).autoImage = aiImageUrl;
+    }
 
     const audienceShort: Record<string, string> = { pain: 'Pain', healing: 'Recovery', weight: 'Weight', energy: 'Energy' };
     const proj: ContentPiece = {
@@ -105,11 +119,11 @@ export default function AppShell() {
         <div className="topnav">
           <button className={view === 'home' ? 'active' : ''} onClick={() => setView('home')}>Create</button>
           <button className={view === 'studio' ? 'active' : ''} onClick={() => { setCurrent(current || projects[0] || null); setView('studio'); }}>Library</button>
-          <button onClick={() => showToast('Calendar view — connect accounts to schedule across channels')}>Calendar</button>
+          <button onClick={() => showToast('Calendar view — connect accounts to schedule')}>Calendar</button>
         </div>
         <div className="spacer" />
         <button className="iconbtn" onClick={() => showToast('All caught up — no new alerts')}><Icon n="bell" size={18} /></button>
-        <button className="btn btn-gold" onClick={() => pick('ig-post')}><Icon n="plus" size={16} />New</button>
+        <Btn variant="gold" icon="plus" onClick={() => pick('ig-post')}>New Post</Btn>
         <div className="avatar" title="Foothill Wellness">FW</div>
       </div>
 
