@@ -127,8 +127,8 @@ function AIImagePanel({ service, audience, onGenerated, onClose }: {
       });
       const json = await res.json();
       if (json.ok) setPreview(json.dataUrl);
-      else setError(json.error || 'Add OPENAI_API_KEY to Vercel env vars to enable AI images.');
-    } catch { setError('Network error — check your Vercel environment variables.'); }
+      else setError(json.error || 'Image generation failed — try again.');
+    } catch { setError('Network error — please try again.'); }
     setLoading(false);
   }
 
@@ -186,10 +186,7 @@ function AIImagePanel({ service, audience, onGenerated, onClose }: {
 
           {error && (
             <div style={{ marginTop: 14, background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10, padding: '12px 16px' }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: '#dc2626', marginBottom: 4 }}>⚠ {error}</div>
-              <div style={{ fontSize: 11.5, color: '#7f1d1d', lineHeight: 1.5 }}>
-                Add <code style={{ background: '#fee2e2', padding: '1px 6px', borderRadius: 4 }}>OPENAI_API_KEY</code> to your Vercel project environment variables to enable AI image generation.
-              </div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#dc2626' }}>⚠ {error}</div>
             </div>
           )}
 
