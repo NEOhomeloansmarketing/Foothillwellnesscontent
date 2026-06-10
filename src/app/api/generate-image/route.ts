@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import OpenAI from 'openai';
 
 // Service → ideal photography style for DALL-E prompt
 const SERVICE_STYLE: Record<string, string> = {
@@ -31,10 +32,11 @@ export async function POST(req: NextRequest) {
   const { prompt, service, audience } = await req.json();
 
   if (!process.env.OPENAI_API_KEY) {
-    return NextResponse.json({ ok: false, error: 'OPENAI_API_KEY not configured' }, { status: 400 });
+    return NextResponse.json({ ok: false, error: 'OPENAI_API_KEY not configured in Vercel' }, { status: 400 });
   }
 
-  // Build a detailed, wellness-specific prompt
+  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
   const serviceStyle = SERVICE_STYLE[service] || AUDIENCE_STYLE[audience] || 'a beautiful wellness spa setting with natural lighting';
   const userAddition = prompt ? ` Additional direction: ${prompt}.` : '';
 
@@ -49,41 +51,25 @@ export async function POST(req: NextRequest) {
   ].join(' ');
 
   try {
-    const res = await fetch('https://api.openai.com/v1/images/generations', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: 'dall-e-3',
-        prompt: fullPrompt,
-        n: 1,
-        size: '1024x1024',
-        quality: 'standard',
-        response_format: 'b64_json',
-      }),
+    const response = await openai.images.generate({
+      model: 'dall-e-3',
+      prompt: fullPrompt,
+      n: 1,
+      size: '1024x1024',
+      quality: 'standard',
+      response_format: 'url',
     });
 
-    if (!res.ok) {
-      const err = await res.json();
-      return NextResponse.json({ ok: false, error: err.error?.message || 'Image generation failed' }, { status: 500 });
+    const url = response.data?.[0]?.url;
+    const revisedPrompt = response.data?.[0]?.revised_prompt;
+
+    if (!url) {
+      return NextResponse.json({ ok: false, error: 'No image returned from DALL-E' }, { status: 500 });
     }
 
-    const json = await res.json();
-    const b64 = json.data?.[0]?.b64_json;
-    const revisedPrompt = json.data?.[0]?.revised_prompt;
-
-    if (!b64) {
-      return NextResponse.json({ ok: false, error: 'No image returned' }, { status: 500 });
-    }
-
-    return NextResponse.json({
-      ok: true,
-      dataUrl: `data:image/png;base64,${b64}`,
-      revisedPrompt,
-    });
-  } catch (e) {
-    return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
+    return NextResponse.json({ ok: true, dataUrl: url, revisedPrompt });
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return NextResponse.json({ ok: false, error: msg }, { status: 500 });
   }
 }
