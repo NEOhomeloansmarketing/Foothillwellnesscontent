@@ -42,68 +42,74 @@ export default function AppShell() {
     setGenerating(true);
     setCurrent(null);
 
-    const usedHooks = projects.filter(p => p.service === opts.service).map(p => p.graphic.hook);
-    const usedProof = projects.filter(p => p.audience === opts.audience).map(p => p.proofUsed).filter(Boolean);
+    try {
+      const usedHooks = projects.filter(p => p.service === opts.service).map(p => p.graphic.hook);
+      const usedProof = projects.filter(p => p.audience === opts.audience).map(p => p.proofUsed).filter(Boolean);
 
-    if (usedHooks.length) {
-      setTimeout(() => showToast(`Steering away from ${usedHooks.length} past hook${usedHooks.length > 1 ? 's' : ''} for ${opts.service}`), 1000);
-    }
-
-    const minWait = new Promise(r => setTimeout(r, 4800));
-
-    // Start baked content immediately
-    let content = bakedGenerate({ ...opts, usedHooks, usedProof });
-
-    // Fire all 3 in parallel: AI text, AI image, min wait
-    let aiImageUrl: string | null = null;
-
-    const textPromise = fetch('/api/generate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ service: opts.service, audience: opts.audience, goal: opts.goal, notes: opts.notes, usedHooks }),
-    }).then(r => r.json()).then(json => {
-      if (json.ok && json.data) {
-        const d = json.data;
-        content = {
-          ...content,
-          graphic: { ...content.graphic, hook: d.hook || content.graphic.hook, emphasis: d.emphasis || content.graphic.emphasis, subhook: d.subhook || content.graphic.subhook },
-          caption: d.caption || content.caption,
-          hashtags: d.hashtags?.length ? d.hashtags : content.hashtags,
-        };
+      if (usedHooks.length) {
+        setTimeout(() => showToast(`Steering away from ${usedHooks.length} past hook${usedHooks.length > 1 ? 's' : ''} for ${opts.service}`), 1000);
       }
-    }).catch(() => {});
 
-    const imagePromise = opts.userImage ? Promise.resolve() : fetch('/api/generate-image', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ service: opts.service, audience: opts.audience }),
-    }).then(r => r.json()).then(json => {
-      if (json.ok && json.dataUrl) aiImageUrl = json.dataUrl;
-    }).catch(() => {});
+      const minWait = new Promise(r => setTimeout(r, 4800));
+      let content = bakedGenerate({ ...opts, usedHooks, usedProof });
+      let aiImageUrl: string | null = null;
 
-    await Promise.all([minWait, textPromise, imagePromise]);
+      // Helper: fetch with a hard timeout so Promise.all never hangs
+      function fetchWithTimeout(url: string, init: RequestInit, ms: number) {
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), ms);
+        return fetch(url, { ...init, signal: ctrl.signal })
+          .finally(() => clearTimeout(timer));
+      }
 
-    // Set image: user upload > DALL-E 3 > nothing (no Unsplash fallback)
-    if (opts.userImage) {
-      (content as { autoImage: string | string[] }).autoImage = opts.userImage;
-    } else if (aiImageUrl) {
-      (content as { autoImage: string }).autoImage = aiImageUrl;
+      const textPromise = fetchWithTimeout('/api/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ service: opts.service, audience: opts.audience, goal: opts.goal, notes: opts.notes, usedHooks }),
+      }, 30000).then(r => r.json()).then(json => {
+        if (json.ok && json.data) {
+          const d = json.data;
+          content = {
+            ...content,
+            graphic: { ...content.graphic, hook: d.hook || content.graphic.hook, emphasis: d.emphasis || content.graphic.emphasis, subhook: d.subhook || content.graphic.subhook },
+            caption: d.caption || content.caption,
+            hashtags: d.hashtags?.length ? d.hashtags : content.hashtags,
+          };
+        }
+      }).catch(() => {});
+
+      const imagePromise = opts.userImage ? Promise.resolve() : fetchWithTimeout('/api/generate-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ service: opts.service, audience: opts.audience }),
+      }, 45000).then(r => r.json()).then(json => {
+        if (json.ok && json.dataUrl) aiImageUrl = json.dataUrl;
+      }).catch(() => {});
+
+      await Promise.all([minWait, textPromise, imagePromise]);
+
+      if (opts.userImage) {
+        (content as { autoImage: string | string[] }).autoImage = opts.userImage;
+      } else if (aiImageUrl) {
+        (content as { autoImage: string }).autoImage = aiImageUrl;
+      }
+
+      const audienceShort: Record<string, string> = { pain: 'Pain', healing: 'Recovery', weight: 'Weight', energy: 'Energy' };
+      const proj: ContentPiece = {
+        id: 'p' + Math.random().toString(36).slice(2, 8),
+        createdAt: Date.now(),
+        channels: [],
+        status: 'draft',
+        title: `${opts.service} · ${audienceShort[opts.audience]}`,
+        ...content,
+      };
+
+      addProject(proj);
+    } catch {
+      showToast('Generation failed — please try again');
+    } finally {
+      setGenerating(false);
     }
-    // If DALL-E didn't return (no API key configured), autoImage stays null —
-    // user can generate manually via the Image tab in the editor
-
-    const audienceShort: Record<string, string> = { pain: 'Pain', healing: 'Recovery', weight: 'Weight', energy: 'Energy' };
-    const proj: ContentPiece = {
-      id: 'p' + Math.random().toString(36).slice(2, 8),
-      createdAt: Date.now(),
-      channels: [],
-      status: 'draft',
-      title: `${opts.service} · ${audienceShort[opts.audience]}`,
-      ...content,
-    };
-
-    addProject(proj);
-    setGenerating(false);
   }
 
   function openProject(p: ContentPiece) {

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 
+export const maxDuration = 60;
+
 // Service → ideal photography style for DALL-E prompt
 const SERVICE_STYLE: Record<string, string> = {
   'Cryotherapy': 'a modern cryotherapy chamber with cool blue LED lighting, a person emerging looking refreshed and energized',
