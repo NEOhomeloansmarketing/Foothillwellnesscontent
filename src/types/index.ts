@@ -1,7 +1,17 @@
 export type AudienceId = 'pain' | 'healing' | 'weight' | 'energy';
 export type TemplateId = 'educate' | 'statement' | 'proof' | 'photo' | 'editorial';
 export type StatusType = 'draft' | 'scheduled' | 'posted';
-export type ChannelId = 'instagram' | 'facebook' | 'tiktok' | 'youtube' | 'google';
+export type ChannelId = 'instagram' | 'google';
+
+export interface SocialAccount {
+  platform: 'instagram' | 'google';
+  accessToken: string;
+  refreshToken?: string;
+  accountId: string;
+  locationId?: string;
+  name: string;
+  connectedAt: number;
+}
 export type GoalId = 'Awareness' | 'Education' | 'New Guest Special' | 'Promotion';
 
 export interface Benefit {

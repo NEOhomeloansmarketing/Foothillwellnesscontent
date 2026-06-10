@@ -6,7 +6,7 @@ import Btn from './ui/Btn';
 import GraphicCanvas, { TEMPLATES } from './graphic/GraphicCanvas';
 import { AUD } from '@/lib/content';
 import { useStore } from '@/store';
-import type { ContentPiece, ChannelId, ChatMessage, FiveLaw, TextOverlay } from '@/types';
+import type { ContentPiece, ChannelId, ChatMessage, FiveLaw, TextOverlay, SocialAccount } from '@/types';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function fmtDate(ts: number) {
@@ -19,7 +19,7 @@ function fmtDate(ts: number) {
 }
 
 const CHANNELS: [ChannelId, string][] = [
-  ['instagram', 'Instagram'], ['facebook', 'Facebook'], ['tiktok', 'TikTok'], ['youtube', 'YT Shorts'], ['google', 'Google'],
+  ['instagram', 'Instagram'], ['google', 'Google Business'],
 ];
 
 const GEN_STEPS = [
@@ -292,9 +292,11 @@ interface CanvasProps {
   chans: ChannelId[];
   onChans: (c: ChannelId[]) => void;
   onSave: (p: ContentPiece) => void;
+  accounts: SocialAccount[];
+  getExportDataUrl: () => Promise<string | null>;
 }
 
-function CanvasPanel({ current, img, imgPos, onImgPos, onEditField, onUpdate, onExport, onToast, chans, onChans, onSave }: CanvasProps) {
+function CanvasPanel({ current, img, imgPos, onImgPos, onEditField, onUpdate, onExport, onToast, chans, onChans, onSave, accounts, getExportDataUrl }: CanvasProps) {
   const [showCaption, setShowCaption] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [selectedOverlay, setSelectedOverlay] = useState<string | null>(null);
@@ -557,24 +559,150 @@ function CanvasPanel({ current, img, imgPos, onImgPos, onEditField, onUpdate, on
       </div>
 
       {/* Publish bar */}
-      <div className="ed-publish">
-        <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--gold-muted)' }}>Post to</div>
-        <div style={{ display: 'flex', gap: 6 }}>
-          {CHANNELS.map(([id, label]) => (
-            <button key={id} className={`chan ${chans.includes(id) ? 'on' : ''}`} title={label}
-              onClick={() => onChans(chans.includes(id) ? chans.filter(x => x !== id) : [...chans, id])}>
-              <Social n={id} size={16} />
+      <PublishBar
+        current={current}
+        chans={chans}
+        onChans={onChans}
+        accounts={accounts}
+        onSave={onSave}
+        onToast={onToast}
+        getExportDataUrl={getExportDataUrl}
+      />
+    </div>
+  );
+}
+
+// ─── Publish bar ─────────────────────────────────────────────────────────────
+function PublishBar({ current, chans, onChans, accounts, onSave, onToast, getExportDataUrl }: {
+  current: ContentPiece;
+  chans: ChannelId[];
+  onChans: (c: ChannelId[]) => void;
+  accounts: SocialAccount[];
+  onSave: (p: ContentPiece) => void;
+  onToast: (msg: string) => void;
+  getExportDataUrl: () => Promise<string | null>;
+}) {
+  const [posting, setPosting] = useState(false);
+
+  const igAccount = accounts.find(a => a.platform === 'instagram');
+  const gAccount = accounts.find(a => a.platform === 'google');
+
+  async function handlePost() {
+    const selected = chans.filter(c => c === 'instagram' ? !!igAccount : !!gAccount);
+    if (!selected.length) { onToast('Connect an account first'); return; }
+
+    setPosting(true);
+    onToast('Preparing image…');
+
+    try {
+      // Export canvas as data URL
+      const dataUrl = await getExportDataUrl();
+      if (!dataUrl) throw new Error('Could not export canvas');
+
+      // Upload to Vercel Blob for public URL
+      const uploadRes = await fetch('/api/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dataUrl }),
+      });
+      const uploadData = await uploadRes.json();
+
+      const imageUrl: string | null = uploadData.ok ? uploadData.url : null;
+      const caption = current.caption + '\n\n' + current.hashtags.join(' ');
+      const results: string[] = [];
+      const errors: string[] = [];
+
+      if (selected.includes('instagram') && igAccount) {
+        if (!imageUrl) { errors.push('Instagram: image upload failed'); }
+        else {
+          const res = await fetch('/api/post/instagram', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ imageUrl, caption, igUserId: igAccount.accountId, accessToken: igAccount.accessToken }),
+          });
+          const data = await res.json();
+          if (data.ok) results.push('Instagram ✓');
+          else errors.push('Instagram: ' + data.error);
+        }
+      }
+
+      if (selected.includes('google') && gAccount) {
+        const res = await fetch('/api/post/google', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ imageUrl, caption: current.caption, locationName: gAccount.locationId || gAccount.accountId, accessToken: gAccount.accessToken, refreshToken: gAccount.refreshToken }),
+        });
+        const data = await res.json();
+        if (data.ok) results.push('Google Business ✓');
+        else errors.push('Google: ' + data.error);
+      }
+
+      if (results.length) {
+        onSave({ ...current, channels: chans, status: 'posted' });
+        onToast('Posted to ' + results.join(', '));
+      }
+      if (errors.length) onToast(errors[0]);
+    } catch (e) {
+      onToast(e instanceof Error ? e.message : 'Post failed');
+    } finally {
+      setPosting(false);
+    }
+  }
+
+  return (
+    <div className="ed-publish" style={{ flexDirection: 'column', gap: 10, padding: '14px 20px' }}>
+      <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--gold-muted)' }}>Publish To</div>
+      <div style={{ display: 'flex', gap: 8 }}>
+        {/* Instagram */}
+        <div style={{ flex: 1, border: `1.5px solid ${igAccount ? '#d6ebdd' : 'var(--line)'}`, borderRadius: 12, padding: '10px 12px', background: igAccount ? '#eef6f0' : '#fff', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ flexShrink: 0, color: igAccount ? '#2d6a4a' : 'var(--muted)' }}>
+            <Social n="instagram" size={20} />
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: igAccount ? '#2d6a4a' : 'var(--navy-mid)' }}>Instagram</div>
+            {igAccount
+              ? <div style={{ fontSize: 11, color: '#43a06a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{igAccount.name}</div>
+              : <div style={{ fontSize: 11, color: 'var(--muted)' }}>Not connected</div>}
+          </div>
+          {igAccount ? (
+            <button onClick={() => onChans(chans.includes('instagram') ? chans.filter(x => x !== 'instagram') : [...chans, 'instagram'])}
+              style={{ width: 22, height: 22, borderRadius: '50%', border: `2px solid ${chans.includes('instagram') ? '#43a06a' : 'var(--line)'}`, background: chans.includes('instagram') ? '#43a06a' : '#fff', flexShrink: 0, cursor: 'pointer', display: 'grid', placeItems: 'center', color: '#fff' }}>
+              {chans.includes('instagram') && <Icon n="check" size={12} sw={2.5} />}
             </button>
-          ))}
+          ) : (
+            <a href="/api/auth/instagram" style={{ fontSize: 11, fontWeight: 700, color: 'var(--navy-mid)', background: 'var(--cream)', border: '1px solid var(--line)', borderRadius: 7, padding: '4px 9px', textDecoration: 'none', flexShrink: 0 }}>Connect</a>
+          )}
         </div>
-        <div style={{ flex: 1 }} />
-        <Btn variant="ghost" icon="calendar" onClick={() => onToast('Connect your accounts to schedule')}>Schedule</Btn>
-        <Btn variant="gold" icon="send" onClick={() => {
-          if (!chans.length) { onToast('Pick at least one channel'); return; }
-          onSave({ ...current, channels: chans, status: 'scheduled' });
-          onToast('Scheduled to ' + CHANNELS.filter(c => chans.includes(c[0])).map(c => c[1]).join(', '));
-        }}>Post Now</Btn>
+
+        {/* Google Business */}
+        <div style={{ flex: 1, border: `1.5px solid ${gAccount ? '#d6ebdd' : 'var(--line)'}`, borderRadius: 12, padding: '10px 12px', background: gAccount ? '#eef6f0' : '#fff', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ flexShrink: 0, color: gAccount ? '#2d6a4a' : 'var(--muted)' }}>
+            <Social n="google" size={20} />
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: gAccount ? '#2d6a4a' : 'var(--navy-mid)' }}>Google Business</div>
+            {gAccount
+              ? <div style={{ fontSize: 11, color: '#43a06a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{gAccount.name}</div>
+              : <div style={{ fontSize: 11, color: 'var(--muted)' }}>Not connected</div>}
+          </div>
+          {gAccount ? (
+            <button onClick={() => onChans(chans.includes('google') ? chans.filter(x => x !== 'google') : [...chans, 'google'])}
+              style={{ width: 22, height: 22, borderRadius: '50%', border: `2px solid ${chans.includes('google') ? '#43a06a' : 'var(--line)'}`, background: chans.includes('google') ? '#43a06a' : '#fff', flexShrink: 0, cursor: 'pointer', display: 'grid', placeItems: 'center', color: '#fff' }}>
+              {chans.includes('google') && <Icon n="check" size={12} sw={2.5} />}
+            </button>
+          ) : (
+            <a href="/api/auth/google" style={{ fontSize: 11, fontWeight: 700, color: 'var(--navy-mid)', background: 'var(--cream)', border: '1px solid var(--line)', borderRadius: 7, padding: '4px 9px', textDecoration: 'none', flexShrink: 0 }}>Connect</a>
+          )}
+        </div>
       </div>
+
+      <button
+        onClick={handlePost}
+        disabled={posting || (!igAccount && !gAccount)}
+        style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9, padding: '13px', borderRadius: 12, background: (posting || (!igAccount && !gAccount)) ? 'var(--line-soft)' : 'var(--navy-deep)', color: (posting || (!igAccount && !gAccount)) ? 'var(--muted)' : 'var(--gold-cta)', fontSize: 14, fontWeight: 700, border: 'none', cursor: (posting || (!igAccount && !gAccount)) ? 'not-allowed' : 'pointer', transition: '.15s', letterSpacing: '.04em' }}>
+        <Icon n={posting ? 'refresh' : 'send'} size={16} />
+        {posting ? 'Posting…' : 'Post Now'}
+      </button>
     </div>
   );
 }
@@ -863,6 +991,7 @@ export default function Studio({ projects, current, generating, onSelect, onUpda
   const [imgPos, setImgPos] = useState({ x: 50, y: 35 });
   const [chans, setChans] = useState<ChannelId[]>(['instagram']);
   const fileRef = useRef<HTMLInputElement | null>(null);
+  const accounts = useStore(s => s.accounts);
 
   useEffect(() => {
     setImg(current?.autoImage ?? null);
@@ -881,13 +1010,20 @@ export default function Studio({ projects, current, generating, onSelect, onUpda
     onUpdate({ ...current, graphic: { ...current.graphic, [field]: val } });
   }
 
-  async function exportPng() {
-    if (!current) return;
+  async function getExportDataUrl(): Promise<string | null> {
     try {
       const { toPng } = await import('html-to-image');
       const node = document.getElementById('export-canvas');
-      if (node) {
-        const url = await toPng(node, { width: 1080, height: 1080, pixelRatio: 1, cacheBust: true });
+      if (!node) return null;
+      return await toPng(node, { width: 1080, height: 1080, pixelRatio: 1, cacheBust: true });
+    } catch { return null; }
+  }
+
+  async function exportPng() {
+    if (!current) return;
+    try {
+      const url = await getExportDataUrl();
+      if (url) {
         const a = document.createElement('a');
         a.href = url;
         a.download = current.service.replace(/[^a-z0-9]/gi, '-').toLowerCase() + '-post.png';
@@ -944,6 +1080,7 @@ export default function Studio({ projects, current, generating, onSelect, onUpda
         current={current} img={img} imgPos={imgPos} onImgPos={setImgPos}
         onEditField={editField} onUpdate={onUpdate} onExport={exportPng} onToast={onToast}
         chans={chans} onChans={setChans} onSave={onSave}
+        accounts={accounts} getExportDataUrl={getExportDataUrl}
       />
 
       <RightPanel

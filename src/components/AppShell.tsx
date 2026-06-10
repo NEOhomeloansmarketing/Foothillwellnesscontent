@@ -1,5 +1,5 @@
 'use client';
-import { useRef } from 'react';
+import { useRef, useEffect } from 'react';
 import Image from 'next/image';
 import Icon from './ui/Icon';
 import Btn from './ui/Btn';
@@ -9,14 +9,55 @@ import Studio from './Studio';
 import { useStore } from '@/store';
 import { bakedGenerate } from '@/lib/content';
 import { contentTypes } from '@/lib/brand';
-import type { ContentPiece, GenerateOptions } from '@/types';
+import type { ContentPiece, GenerateOptions, SocialAccount } from '@/types';
 
 export default function AppShell() {
   const {
     projects, current, view, flowOpen, generating, toast,
     setCurrent, setView, setFlowOpen, setGenerating, setToast,
-    updateCurrent, addProject,
+    updateCurrent, addProject, setAccount,
   } = useStore();
+
+  // Handle OAuth callbacks from Instagram and Google
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const p = new URLSearchParams(window.location.search);
+
+    if (p.get('ig_connected') === '1') {
+      const account: SocialAccount = {
+        platform: 'instagram',
+        accessToken: p.get('ig_token') || '',
+        accountId: p.get('ig_id') || '',
+        name: p.get('ig_name') || 'Instagram',
+        connectedAt: Date.now(),
+      };
+      setAccount(account);
+      showToast('Instagram connected — ' + account.name);
+      window.history.replaceState({}, '', window.location.pathname);
+    } else if (p.get('ig_error')) {
+      showToast('Instagram error: ' + p.get('ig_error'));
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+
+    if (p.get('g_connected') === '1') {
+      const account: SocialAccount = {
+        platform: 'google',
+        accessToken: p.get('g_token') || '',
+        refreshToken: p.get('g_refresh') || undefined,
+        accountId: p.get('g_account') || '',
+        locationId: p.get('g_location') || undefined,
+        name: p.get('g_name') || 'Google Business',
+        connectedAt: Date.now(),
+      };
+      setAccount(account);
+      showToast('Google Business connected — ' + account.name);
+      window.history.replaceState({}, '', window.location.pathname);
+    } else if (p.get('g_error')) {
+      showToast('Google error: ' + p.get('g_error'));
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const toastT = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
