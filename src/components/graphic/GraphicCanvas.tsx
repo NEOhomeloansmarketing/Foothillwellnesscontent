@@ -303,93 +303,69 @@ function Tpl4({ c, e }: { c: GraphicContent; img: string[] | null; pos?: { x: nu
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// TEMPLATE 5 · Right Column Split
-// Left: hook + empathy + benefits | Right: photo (top) + star testimonial (bottom) | Gold CTA + address footer
+// TEMPLATE 5 · Magazine Cover
+// Photo top 52% | Cream bottom: large hook, benefit pill row, navy CTA strip
 // ─────────────────────────────────────────────────────────────────────────────
 function Tpl5({ c, img, pos, e }: { c: GraphicContent; img: string[] | null; pos?: { x: number; y: number }; e?: EH }) {
-  const fontSize = hs(c.hook?.length || 0, 80, 46);
+  const hookSize = hs(c.hook?.length || 0, 84, 52);
   const benefits = [...(c.benefits || [])].slice(0, 4);
   while (benefits.length < 4) benefits.push([BENEFIT_ICONS[benefits.length], '']);
   return (
     <div style={{ position: 'absolute', inset: 0, background: C.cream, fontFamily: "'Inter',sans-serif", display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
-      {/* Main row */}
-      <div style={{ flex: 1, minHeight: 0, display: 'flex', gap: 24, padding: '40px 36px 0 44px', overflow: 'hidden' }}>
-
-        {/* Left */}
-        <div style={{ width: '53%', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 14, overflow: 'hidden' }}>
-          <Ed e={e} f="eyebrow" s={{ fontSize: 17, fontWeight: 700, letterSpacing: '.18em', textTransform: 'uppercase', color: C.goldMuted }}>{c.eyebrow}</Ed>
-          <div style={{ height: 2, width: 44, background: `linear-gradient(90deg,${C.gold},${C.goldCta})`, borderRadius: 2 }} />
-
-          <Ed e={e} f="hook" tag="h1" s={{ fontFamily: "'Playfair Display',serif", fontWeight: 800, fontSize: fontSize, lineHeight: .9, color: C.navy, textTransform: 'uppercase', margin: 0, letterSpacing: '-.02em' }}>{c.hook}</Ed>
-
-          <Ed e={e} f="tagline" s={{ fontSize: 19, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', color: C.navy }}>{c.tagline}</Ed>
-
-          <Ed e={e} f="problemDesc" multi tag="p" s={{ fontSize: 18, lineHeight: 1.45, color: '#4a556a', margin: 0, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' }}>{c.problemDesc || c.subhook}</Ed>
-
-          {/* Benefits */}
-          <div style={{ border: `1px solid rgba(201,168,76,.3)`, borderRadius: 14, padding: '13px 10px' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 8 }}>
-              {benefits.map(([icon, label], i) => (
-                <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 7 }}>
-                  <div style={{ width: 46, height: 46, borderRadius: '50%', border: `1.5px solid ${C.gold}`, display: 'grid', placeItems: 'center', color: C.gold }}>
-                    <Icon n={icon || BENEFIT_ICONS[i % 4]} size={20} sw={1.5} />
-                  </div>
-                  <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', color: C.navyMid, textAlign: 'center', lineHeight: 1.15 }}>{label}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Testimonial pull quote */}
-          <div style={{ flex: 1, minHeight: 0, background: C.navy, borderRadius: 14, padding: '18px 20px', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 10 }}>
-            <div style={{ fontSize: 48, lineHeight: .7, color: C.gold, fontFamily: "'Playfair Display',serif", fontWeight: 800, opacity: .7 }}>"</div>
-            <Ed e={e} f="quote" multi tag="p" s={{ fontFamily: "'Playfair Display',serif", fontStyle: 'italic', fontSize: 17, lineHeight: 1.45, color: 'rgba(255,255,255,.9)', margin: 0, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 5, WebkitBoxOrient: 'vertical' }}>{c.quote}</Ed>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <div style={{ width: 28, height: 2, background: C.gold, borderRadius: 2 }} />
-              <div style={{ fontSize: 13, fontWeight: 700, color: C.goldCta }}>– {c.proofName}</div>
-            </div>
-            <Stars size={16} />
-          </div>
+      {/* Photo — top 52% */}
+      <div style={{ height: '52%', position: 'relative', background: '#1a2a40', flexShrink: 0, overflow: 'hidden' }}>
+        <Img srcs={img} pos={pos} />
+        {/* Gradient fade into cream */}
+        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 80, background: `linear-gradient(0deg,${C.cream},transparent)` }} />
+        {/* Logo pill top-left */}
+        <div style={{ position: 'absolute', top: 24, left: 32, background: 'rgba(1,24,54,.82)', backdropFilter: 'blur(8px)', borderRadius: 12, padding: '7px 14px', border: '1px solid rgba(201,168,76,.25)', display: 'flex', alignItems: 'center', gap: 9 }}>
+          <Logo h={26} />
         </div>
-
-        {/* Right column */}
-        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 14, overflow: 'hidden' }}>
-          {/* Photo */}
-          <div style={{ flex: 1, position: 'relative', borderRadius: 18, overflow: 'hidden', background: '#1a2a40', minHeight: 0 }}>
-            <Img srcs={img} pos={pos} />
-          </div>
-          {/* Testimonial card */}
-          <div style={{ flexShrink: 0, background: '#fff', border: `1px solid rgba(201,168,76,.22)`, borderRadius: 14, padding: '13px 15px' }}>
-            <Stars size={20} />
-            <Ed e={e} f="quote" multi tag="p" s={{ fontFamily: "'Playfair Display',serif", fontStyle: 'italic', fontSize: 15, lineHeight: 1.35, color: C.navyMid, margin: '7px 0 6px', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' }}>{c.quote}</Ed>
-            <div style={{ fontSize: 13, fontWeight: 700, color: C.navy }}>– {c.proofName}</div>
-          </div>
-        </div>
+        {/* Eyebrow tag top-right */}
+        <Ed e={e} f="eyebrow" s={{ position: 'absolute', top: 28, right: 32, fontSize: 14, fontWeight: 700, letterSpacing: '.2em', textTransform: 'uppercase', color: C.goldCta, background: 'rgba(1,24,54,.7)', backdropFilter: 'blur(6px)', borderRadius: 8, padding: '6px 14px', border: '1px solid rgba(201,168,76,.2)' }}>{c.eyebrow}</Ed>
       </div>
 
-      {/* Gold CTA bar */}
-      <div style={{ background: C.gold, padding: '13px 44px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{ width: 38, height: 38, borderRadius: '50%', background: C.navy, display: 'grid', placeItems: 'center', color: C.goldCta }}><Icon n="phone" size={18} /></div>
-          <div style={{ fontSize: 22, fontWeight: 900, color: C.navy }}>(801) 784-0095</div>
-        </div>
-        <Ed e={e} f="tagline" s={{ fontSize: 14, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', color: C.navy }}>{c.tagline || 'Call or Text to Get Started'}</Ed>
-      </div>
+      {/* Content — bottom 48% */}
+      <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', padding: '20px 44px 0', overflow: 'hidden', gap: 14 }}>
 
-      {/* Footer */}
-      <div style={{ background: C.navy, padding: '10px 44px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: `2px solid rgba(201,168,76,.3)`, flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <Logo h={32} bright />
-          <div>
-            <div style={{ fontFamily: "'Playfair Display',serif", fontSize: 16, fontWeight: 700, color: '#fff' }}>FOOTHILL WELLNESS</div>
-            <div style={{ fontSize: 9, fontWeight: 600, letterSpacing: '.18em', color: C.goldCta, textTransform: 'uppercase' }}>FEEL BETTER FASTER</div>
-          </div>
-        </div>
-        <div style={{ display: 'flex', gap: 14 }}>
-          {[['pin','1414 S Foothill Dr #D, SLC UT'],['phone','(801) 784-0095'],['globe','foothillwellness.com']].map(([icon,text]) => (
-            <div key={icon} style={{ display: 'flex', gap: 4, alignItems: 'center', color: 'rgba(255,255,255,.5)', fontSize: 11 }}><Icon n={icon} size={11} /><span>{text}</span></div>
+        {/* Hook */}
+        <Ed e={e} f="hook" tag="h1" s={{ fontFamily: "'Playfair Display',serif", fontWeight: 800, fontSize: hookSize, lineHeight: .88, color: C.navy, textTransform: 'uppercase', margin: 0, letterSpacing: '-.02em', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' }}>
+          {hookParts(c.hook, c.emphasis).map((p, i) => (
+            <span key={i} style={p.em ? { fontStyle: 'italic', color: C.goldCta } : undefined}>{p.t}</span>
           ))}
+        </Ed>
+
+        {/* Gold rule + subhook */}
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16 }}>
+          <div style={{ width: 4, flexShrink: 0, alignSelf: 'stretch', background: `linear-gradient(180deg,${C.gold},${C.goldCta})`, borderRadius: 2 }} />
+          <Ed e={e} f="subhook" multi tag="p" s={{ fontSize: 19, lineHeight: 1.4, color: '#4a556a', margin: 0, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{c.subhook}</Ed>
+        </div>
+
+        {/* Benefit pills */}
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'nowrap', overflow: 'hidden' }}>
+          {benefits.map(([icon, label], i) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#fff', border: `1.5px solid rgba(201,168,76,.35)`, borderRadius: 999, padding: '9px 16px', flexShrink: 0 }}>
+              <div style={{ color: C.gold, display: 'flex', alignItems: 'center' }}><Icon n={icon || BENEFIT_ICONS[i % 4]} size={17} sw={1.5} /></div>
+              <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: '.05em', textTransform: 'uppercase', color: C.navyMid, whiteSpace: 'nowrap' }}>{label}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Navy CTA strip */}
+      <div style={{ background: C.navy, padding: '16px 44px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0, borderTop: `3px solid ${C.gold}` }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <Logo h={34} />
+          <div style={{ width: 1, height: 32, background: 'rgba(255,255,255,.15)' }} />
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.14em', textTransform: 'uppercase', color: C.goldCta }}>CALL OR TEXT</div>
+            <div style={{ fontSize: 22, fontWeight: 900, color: '#fff', lineHeight: 1 }}>(801) 784-0095</div>
+          </div>
+        </div>
+        <div style={{ textAlign: 'right' }}>
+          <Ed e={e} f="ctaShort" s={{ fontSize: 18, fontWeight: 800, color: C.goldCta, letterSpacing: '.04em', textTransform: 'uppercase' }}>{c.ctaShort || 'Book Today'}</Ed>
+          <div style={{ fontSize: 12, color: 'rgba(255,255,255,.45)', marginTop: 2 }}>foothillwellness.com</div>
         </div>
       </div>
     </div>
