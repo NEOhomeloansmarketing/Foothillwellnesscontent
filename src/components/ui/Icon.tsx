@@ -24,6 +24,7 @@ const PATHS: Record<string, string> = {
   grid:'M4 4h7v7H4z M13 4h7v7h-7z M4 13h7v7H4z M13 13h7v7h-7z',
   bell:'M6 9a6 6 0 1112 0c0 5 2 6 2 6H4s2-1 2-6 M10 21h4',
   close:'M6 6l12 12 M18 6L6 18',
+  x:'M6 6l12 12 M18 6L6 18',
   refresh:'M20 8a8 8 0 10.5 6 M20 4v4h-4',
   copy:'M8 8h11v12H8z M5 16V4h11',
   edit:'M5 19h14 M14 5l4 4-9 9-4 1 1-4z',

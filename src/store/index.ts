@@ -1,7 +1,7 @@
 'use client';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { ContentPiece, ChannelId } from '@/types';
+import type { ContentPiece } from '@/types';
 import { seedProjects } from '@/lib/content';
 
 interface AppStore {
@@ -20,11 +20,12 @@ interface AppStore {
   setToast: (msg: string | null) => void;
   updateCurrent: (p: ContentPiece) => void;
   addProject: (p: ContentPiece) => void;
+  removeProject: (id: string) => void;
 }
 
 export const useStore = create<AppStore>()(
   persist(
-    (set, get) => ({
+    (set) => ({
       projects: seedProjects(),
       current: null,
       view: 'home',
@@ -45,6 +46,10 @@ export const useStore = create<AppStore>()(
       addProject: (p) => set(state => ({
         projects: [p, ...state.projects],
         current: p,
+      })),
+      removeProject: (id) => set(state => ({
+        projects: state.projects.filter(x => x.id !== id),
+        current: state.current?.id === id ? (state.projects.find(x => x.id !== id) ?? null) : state.current,
       })),
     }),
     {

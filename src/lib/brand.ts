@@ -22,7 +22,7 @@ export const fiveLaws = [
   { n:1, name:'It is not about you.', test:"Is this about the customer, or about us? Use 'you' more than 'we'." },
   { n:2, name:'Lead with their problem.', test:'Does this name a problem the customer already feels?' },
   { n:3, name:'Increase perceived likelihood of success.', test:'Does this build confidence with proof, testimonials, or a clear plan?' },
-  { n:4, name:'Increase perceived speed to the dream outcome.', test:'Does this make the result feel closer / sooner — credibly?' },
+  { n:4, name:'Increase perceived speed to the dream outcome.', test:"Does this make the result feel closer / sooner — credibly?" },
   { n:5, name:'Increase perceived ease to the dream outcome.', test:'Does this make the first step feel simple, clear, and low-friction?' },
 ];
 
@@ -50,23 +50,88 @@ export const offerings = [
   { cat: 'Beauty Services', items: ['Brow/Lash Tinting','Brow Shaping/Wax','Brow Lamination','Brow Works','Ultrasonic','High Frequency'] },
 ];
 
+// Real testimonials — tagged by primary audience AND the specific services mentioned
 export const testimonials = [
-  { name:'Olga F.', tag:'weight', text:"I've been going here over a year for weight loss. I'm down 56 lbs, muscle up and feeling great. The nurses are top notch and have been wildly helpful." },
-  { name:'Holly T.', tag:'healing', text:'Foothill has been fantastic helping me recover from ACL surgery. Several sessions in the hyperbaric chamber plus red light therapy made my recovery much easier.' },
-  { name:'Rachael C.', tag:'healing', text:"I started coming while recovering from bone cancer surgery — it's been a game changer. After one cryo session I signed up for a 6-month pass. That's how powerful it was." },
-  { name:'Theresa H.', tag:'pain', text:"I've been using cryotherapy and red light several times a week. My chronic pain has been significantly lessened. The staff is superb." },
-  { name:'Kay C.', tag:'pain', text:'I have 3 herniated discs and arthritis in my lower back. Red light and compression therapy have done wonders. I feel like I can function again.' },
-  { name:'Ethan T.', tag:'pain', text:'The cryo chamber feels amazing and really helped my back pain. The compression therapy is great for recovery.' },
-  { name:'Emily L.', tag:'energy', text:'Since going regularly for red light and whole body cryo, my skin and energy levels have improved. Some old scars look better — less raised and lighter.' },
-  { name:'Sara C.', tag:'energy', text:'Dealing with autoimmune symptoms and menopause is overwhelming, but the hyperbaric chamber, red light, UV IV, and NAD+ made a noticeable difference in my energy, inflammation, and well-being.' },
-  { name:'Phoenix R.', tag:'energy', text:"After three treatment days I felt better than I have in years. These treatments have given me renewed energy and relief from symptoms I thought I'd live with indefinitely." },
-  { name:'Desirae O.', tag:'weight', text:"Every staff member has helped me with my weight loss goals and even cheered me on. I never felt pressured and they were honest about all options." },
-  { name:'Bill H.', tag:'pain', text:"I'd been suffering from lower back pain. Multiple red light sessions and a 3-minute cryo session and I'm good." },
-  { name:'Eric H.', tag:'healing', text:'The red light really helped my shoulder. I hurt my AC joint skiing. First time — got in my car and thought, no way, my shoulder really does feel better already!' },
-  { name:'Bailey N.', tag:'energy', text:'I needed to slow down and recover. From the moment I arrived I was so well taken care of. I felt a night/day difference after I left.' },
-  { name:'Meenakshi S.', tag:'pain', text:'Two months of cryo and red light — I see improvement in my back pain and love the energy boost after cryo.' },
-  { name:'Gina N.', tag:'pain', text:'The hip compression is helping my hip and back pain. I love cryo, sauna, red-light and compression — and started Emsculpt and feel great.' },
-  { name:'Chris F.', tag:'energy', text:'Whole body cryo left me energized, less knee inflammation, and I slept great that night. The cryoskin facial left my face smooth and tight.' },
+  {
+    name: 'Olga F.', tag: 'weight',
+    services: ['Semaglutide','Tirzepatide','Medical Weight Loss & GLP-1'],
+    text: "I've been going here over a year for weight loss. I'm down 56 lbs, muscle up and feeling great. The nurses are top notch and have been wildly helpful.",
+  },
+  {
+    name: 'Holly T.', tag: 'healing',
+    services: ['HBOT / mHBOT','Red Light Therapy'],
+    text: 'Foothill has been fantastic helping me recover from ACL surgery. Several sessions in the hyperbaric chamber plus red light therapy made my recovery much easier.',
+  },
+  {
+    name: 'Rachael C.', tag: 'healing',
+    services: ['Cryotherapy'],
+    text: "I started coming while recovering from bone cancer surgery — it's been a game changer. After one cryo session I signed up for a 6-month pass. That's how powerful it was.",
+  },
+  {
+    name: 'Theresa H.', tag: 'pain',
+    services: ['Cryotherapy','Red Light Therapy'],
+    text: "I've been using cryotherapy and red light several times a week. My chronic pain has been significantly lessened. The staff is superb.",
+  },
+  {
+    name: 'Kay C.', tag: 'pain',
+    services: ['Red Light Therapy','Compression Therapy'],
+    text: 'I have 3 herniated discs and arthritis in my lower back. Red light and compression therapy have done wonders. I feel like I can function again.',
+  },
+  {
+    name: 'Ethan T.', tag: 'pain',
+    services: ['Cryotherapy','Compression Therapy'],
+    text: 'The cryo chamber feels amazing and really helped my back pain. The compression therapy is great for recovery.',
+  },
+  {
+    name: 'Emily L.', tag: 'energy',
+    services: ['Red Light Therapy','Cryotherapy'],
+    text: 'Since going regularly for red light and whole body cryo, my skin and energy levels have improved. Some old scars look better — less raised and lighter.',
+  },
+  {
+    name: 'Sara C.', tag: 'energy',
+    services: ['HBOT / mHBOT','Red Light Therapy','IV Infusions','NAD+ IV','NAD+ IM'],
+    text: 'Dealing with autoimmune symptoms and menopause is overwhelming, but the hyperbaric chamber, red light, UV IV, and NAD+ made a noticeable difference in my energy, inflammation, and well-being.',
+  },
+  {
+    name: 'Phoenix R.', tag: 'energy',
+    services: [],
+    text: "After three treatment days I felt better than I have in years. These treatments have given me renewed energy and relief from symptoms I thought I'd live with indefinitely.",
+  },
+  {
+    name: 'Desirae O.', tag: 'weight',
+    services: ['Semaglutide','Tirzepatide','Medical Weight Loss & GLP-1'],
+    text: "Every staff member has helped me with my weight loss goals and even cheered me on. I never felt pressured and they were honest about all options.",
+  },
+  {
+    name: 'Bill H.', tag: 'pain',
+    services: ['Red Light Therapy','Cryotherapy'],
+    text: "I'd been suffering from lower back pain. Multiple red light sessions and a 3-minute cryo session and I'm good.",
+  },
+  {
+    name: 'Eric H.', tag: 'healing',
+    services: ['Red Light Therapy'],
+    text: 'The red light really helped my shoulder. I hurt my AC joint skiing. First time — got in my car and thought, no way, my shoulder really does feel better already!',
+  },
+  {
+    name: 'Bailey N.', tag: 'energy',
+    services: [],
+    text: 'I needed to slow down and recover. From the moment I arrived I was so well taken care of. I felt a night/day difference after I left.',
+  },
+  {
+    name: 'Meenakshi S.', tag: 'pain',
+    services: ['Cryotherapy','Red Light Therapy'],
+    text: 'Two months of cryo and red light — I see improvement in my back pain and love the energy boost after cryo.',
+  },
+  {
+    name: 'Gina N.', tag: 'pain',
+    services: ['Compression Therapy','Cryotherapy','Infrared Sauna','Red Light Therapy','Emsculpt Neo'],
+    text: 'The hip compression is helping my hip and back pain. I love cryo, sauna, red-light and compression — and started Emsculpt and feel great.',
+  },
+  {
+    name: 'Chris F.', tag: 'energy',
+    services: ['Cryotherapy','Cryo Facial'],
+    text: 'Whole body cryo left me energized, less knee inflammation, and I slept great that night. The cryoskin facial left my face smooth and tight.',
+  },
 ];
 
 export const contentTypes = [

@@ -124,17 +124,18 @@ function StripePlaceholder({ label = 'ADD PHOTO' }: { label?: string }) {
   );
 }
 
-function SmartImage({ srcs, style }: { srcs: string[] | null; style?: React.CSSProperties }) {
+function SmartImage({ srcs, style, pos }: { srcs: string[] | null; style?: React.CSSProperties; pos?: { x: number; y: number } }) {
   const [i, setI] = useState(0);
   const firstSrc = srcs?.[0];
   useEffect(() => { setI(0); }, [firstSrc]); // eslint-disable-line react-hooks/set-state-in-effect
   if (!srcs || i >= srcs.length) return <StripePlaceholder />;
+  const objectPosition = pos ? `${pos.x}% ${pos.y}%` : '50% 35%';
   return (
     <img
       src={srcs[i]}
       onError={() => setI(v => v + 1)}
       crossOrigin="anonymous"
-      style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', ...style }}
+      style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition, ...style }}
       alt=""
     />
   );
@@ -267,7 +268,7 @@ function Hook({ hook, emphasis, size, color = C.white, emColor = C.goldCta, e }:
 // ─── TEMPLATE 1: EDITORIAL (replaces "Educate") ───────────────────────────────
 // Right-heavy photo column + clean left info column
 // Inspired by their Botox/NeveSkin posts
-function TplEducate({ c, img, e }: { c: GraphicContent; img: string[] | null; e?: EditHandle }) {
+function TplEducate({ c, img, pos, e }: { c: GraphicContent; img: string[] | null; pos?: { x: number; y: number }; e?: EditHandle }) {
   const benefits = (c.benefits || []).slice(0, 5);
   return (
     <div style={{ position: 'absolute', inset: 0, background: C.cream, display: 'flex', flexDirection: 'column' }}>
@@ -362,7 +363,7 @@ function TplEducate({ c, img, e }: { c: GraphicContent; img: string[] | null; e?
 
         {/* RIGHT — photo column */}
         <div style={{ flex: 1, position: 'relative', background: C.navyDark }}>
-          {img ? <SmartImage srcs={img} /> : <StripePlaceholder />}
+          {img ? <SmartImage srcs={img} pos={pos} /> : <StripePlaceholder />}
           {/* subtle inner shadow on left edge to blend with cream */}
           <div style={{
             position: 'absolute', inset: 0,
@@ -396,7 +397,7 @@ function TplEducate({ c, img, e }: { c: GraphicContent; img: string[] | null; e?
 
 // ─── TEMPLATE 2: STATEMENT (Bold text on navy) ────────────────────────────────
 // Inspired by their "EXHAUSTED? NOT YOURSELF?" post — very bold, minimal
-function TplStatement({ c, img, e }: { c: GraphicContent; img: string[] | null; e?: EditHandle }) {
+function TplStatement({ c, img, pos, e }: { c: GraphicContent; img: string[] | null; pos?: { x: number; y: number }; e?: EditHandle }) {
   const hookLen = c.hook?.length || 0;
   const fontSize = hookLen > 50 ? 76 : hookLen > 35 ? 90 : 108;
   return (
@@ -444,7 +445,7 @@ function TplStatement({ c, img, e }: { c: GraphicContent; img: string[] | null; 
             border: `2px solid rgba(209,187,116,.3)`,
             boxShadow: '0 20px 50px rgba(0,0,0,.4)',
           }}>
-            <SmartImage srcs={img} />
+            <SmartImage srcs={img} pos={pos} />
           </div>
         )}
       </div>
@@ -472,14 +473,14 @@ function TplStatement({ c, img, e }: { c: GraphicContent; img: string[] | null; 
 }
 
 // ─── TEMPLATE 3: PROOF (Clean testimonial) ───────────────────────────────────
-function TplProof({ c, img, e }: { c: GraphicContent; img: string[] | null; e?: EditHandle }) {
+function TplProof({ c, img, pos, e }: { c: GraphicContent; img: string[] | null; pos?: { x: number; y: number }; e?: EditHandle }) {
   const quoteLen = c.quote?.length || 0;
   const qSize = quoteLen > 200 ? 38 : quoteLen > 150 ? 44 : 52;
   return (
     <div style={{ position: 'absolute', inset: 0, background: C.cream, display: 'flex', flexDirection: 'column' }}>
       {/* Top photo strip */}
       <div style={{ height: '38%', position: 'relative', background: C.navyDark, flexShrink: 0 }}>
-        {img ? <SmartImage srcs={img} /> : <StripePlaceholder />}
+        {img ? <SmartImage srcs={img} pos={pos} /> : <StripePlaceholder />}
         <div style={{
           position: 'absolute', inset: 0,
           background: 'linear-gradient(180deg,rgba(1,24,54,.35) 0%,rgba(1,24,54,.6) 100%)',
@@ -540,12 +541,12 @@ function TplProof({ c, img, e }: { c: GraphicContent; img: string[] | null; e?: 
 }
 
 // ─── TEMPLATE 4: PHOTO (Full-bleed lifestyle) ────────────────────────────────
-function TplPhoto({ c, img, e }: { c: GraphicContent; img: string[] | null; e?: EditHandle }) {
+function TplPhoto({ c, img, pos, e }: { c: GraphicContent; img: string[] | null; pos?: { x: number; y: number }; e?: EditHandle }) {
   const hookLen = c.hook?.length || 0;
   const hSize = hookLen > 45 ? 74 : hookLen > 30 ? 88 : 102;
   return (
     <div style={{ position: 'absolute', inset: 0, background: C.navy }}>
-      {img ? <SmartImage srcs={img} /> : <StripePlaceholder />}
+      {img ? <SmartImage srcs={img} pos={pos} /> : <StripePlaceholder />}
 
       {/* Gradient overlays */}
       <div style={{
@@ -597,7 +598,7 @@ function TplPhoto({ c, img, e }: { c: GraphicContent; img: string[] | null; e?: 
 
 // ─── TEMPLATE 5: EDITORIAL SPLIT ─────────────────────────────────────────────
 // Inspired by their "PEPTIDES?" post — photo left, structured info right
-function TplEditorial({ c, img, e }: { c: GraphicContent; img: string[] | null; e?: EditHandle }) {
+function TplEditorial({ c, img, pos, e }: { c: GraphicContent; img: string[] | null; pos?: { x: number; y: number }; e?: EditHandle }) {
   const hookLen = c.hook?.length || 0;
   const hSize = hookLen > 40 ? 68 : 84;
   return (
@@ -628,7 +629,7 @@ function TplEditorial({ c, img, e }: { c: GraphicContent; img: string[] | null; 
       <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
         {/* Photo */}
         <div style={{ width: '44%', position: 'relative', background: C.navyDark }}>
-          {img ? <SmartImage srcs={img} /> : <StripePlaceholder />}
+          {img ? <SmartImage srcs={img} pos={pos} /> : <StripePlaceholder />}
           <div style={{
             position: 'absolute', inset: 0,
             background: 'linear-gradient(90deg,transparent 75%,rgba(250,248,243,.08))',
@@ -696,12 +697,13 @@ interface GraphicCanvasProps {
   tpl: TemplateId;
   content: GraphicContent;
   img?: string | string[] | null;
+  imgPos?: { x: number; y: number };
   edit?: EditHandle;
 }
 
-export default function GraphicCanvas({ tpl, content, img, edit }: GraphicCanvasProps) {
+export default function GraphicCanvas({ tpl, content, img, imgPos, edit }: GraphicCanvasProps) {
   const srcs = img ? (Array.isArray(img) ? img : [img]) : null;
-  const props = { c: content, img: srcs, e: edit };
+  const props = { c: content, img: srcs, pos: imgPos, e: edit };
   if (tpl === 'statement') return <TplStatement {...props} />;
   if (tpl === 'proof') return <TplProof {...props} />;
   if (tpl === 'photo') return <TplPhoto {...props} />;

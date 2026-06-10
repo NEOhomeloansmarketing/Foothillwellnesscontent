@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { AUD } from '@/lib/content';
+import { fiveLaws, testimonials } from '@/lib/brand';
 import type { AudienceId } from '@/types';
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -8,16 +9,54 @@ const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 export async function POST(req: NextRequest) {
   const { service, audience, goal, notes, usedHooks = [] } = await req.json();
 
-  const prompt = `You are Foothill Wellness's marketing strategist. Brand: "Feel Better Faster". Voice: warm, confident, human, premium-but-approachable, never salesy or clinical. Filter through the Five Laws of Marketing (customer is hero, lead with their problem, build belief, make it feel faster + easier, low-friction CTA). Guardrails: no guaranteed results or disease claims; use "may help / can support / many clients report".
+  // Pull service-specific testimonials first, then audience-tagged fallbacks
+  const serviceTestimonials = testimonials.filter(t => t.services?.includes(service));
+  const audienceTestimonials = testimonials.filter(t => t.tag === audience && !serviceTestimonials.includes(t));
+  const relevantProof = [...serviceTestimonials, ...audienceTestimonials].slice(0, 3);
 
-Create an Instagram post for service "${service}", audience "${AUD[audience as AudienceId]}", goal "${goal}".${notes ? ` Additional notes from the team: ${notes}` : ''} Avoid repeating these hooks already used: ${usedHooks.join(' | ') || 'none'}.
+  const proofBlock = relevantProof.length
+    ? `REAL CLIENT TESTIMONIALS (use one of these for the caption proof section):\n` +
+      relevantProof.map(t => `- "${t.text}" — ${t.name}`).join('\n')
+    : '';
 
-Return ONLY valid minified JSON: {"hook":"short bold hook (<=60 chars)","emphasis":"one word from hook to italicize","subhook":"one supportive sentence","caption":"full IG caption following Problem-Empathy-Guide-Proof-Speed-Ease structure, plain text with line breaks, end with: Call or text (801) 784-0095","hashtags":["8 relevant tags"]}`;
+  const lawsBlock = fiveLaws.map(l => `  Law ${l.n}: ${l.name} — ${l.test}`).join('\n');
+
+  const prompt = `You are the brand voice for Foothill Wellness, a premium wellness center in Salt Lake City, UT.
+
+BRAND PROMISE: "Your body already knows how to heal itself. Foothill Wellness helps it heal faster."
+TAGLINE: "Feel Better Faster"
+VOICE: Warm, confident, knowledgeable, human, encouraging. Premium but approachable. Never salesy. Never clinical jargon. Never miracle claims.
+
+THE FIVE LAWS OF MARKETING — every piece must pass all five:
+${lawsBlock}
+
+GUARDRAILS:
+• No guaranteed results or disease-treatment claims
+• Use "may help", "can support", "many clients report"
+• Customer is the HERO — Foothill is the guide
+• More "you" than "we"
+• Lead with the client's PROBLEM before ever naming the treatment
+
+CONTENT ASSIGNMENT:
+Service: ${service}
+Audience: ${AUD[audience as AudienceId]}
+Goal: ${goal}
+${notes ? `Team notes: ${notes}` : ''}
+Avoid repeating these hooks: ${usedHooks.join(' | ') || 'none'}
+
+${proofBlock}
+
+CAPTION SEQUENCE TO FOLLOW: Problem → Empathy → Guide → Plan → Proof → Speed → Ease → Action
+The hook must name the PROBLEM the audience already FEELS — before mentioning ${service}.
+End the caption with: "Call or text (801) 784-0095 · Foothill Wellness, Salt Lake City"
+
+Return ONLY valid minified JSON (no markdown fences, no explanation outside JSON):
+{"hook":"bold problem-led hook ≤60 chars","emphasis":"1-3 word phrase from hook to italicize","subhook":"one warm human sentence about what ${service} may do for them","caption":"full IG caption, plain text with line breaks","hashtags":["8 relevant hashtags with #"]}`;
 
   try {
     const message = await client.messages.create({
       model: 'claude-sonnet-4-6',
-      max_tokens: 1024,
+      max_tokens: 1400,
       messages: [{ role: 'user', content: prompt }],
     });
     const raw = (message.content[0] as { text: string }).text;
