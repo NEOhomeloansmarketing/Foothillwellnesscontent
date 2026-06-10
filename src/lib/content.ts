@@ -109,13 +109,36 @@ function matchTestimonial(audience: AudienceId, used: string[]) {
   return list[Math.floor(Math.random() * list.length)] || testimonials[0];
 }
 
+// Curated Unsplash photo IDs by wellness theme
+const UNSPLASH_POOL: Record<string, string[]> = {
+  sauna: ['1540555700478-4be289fbecef','1556742049-0cfed4f6a45d','1573883431205-98b5f615d6f8'],
+  cryo: ['1571019613454-1cb2f99b2d8b','1515377905703-c4788e51af15','1544161515-4ab6ce6db874'],
+  'red-light': ['1559757148-5c350d0d3c56','1512621776951-a57141f2eefd','1570172619644-dfd03ed5d881'],
+  iv: ['1576091160399-112ba8d25d1d','1559757175-5700dde675bc','1571019613454-1cb2f99b2d8b'],
+  nad: ['1559757175-5700dde675bc','1516975080664-ed2fc6a32937','1576091160550-2173dba999ef'],
+  weight: ['1571019614242-c5c5dee9f50b','1476480221304-6b5574f8d8e5','1518611012118-696072aa579a'],
+  pain: ['1544161515-4ab6ce6db874','1506126613408-eca07ce68773','1600334129128-685c5582fd35'],
+  healing: ['1571019614242-c5c5dee9f50b','1559757175-5700dde675bc','1600585154340-be6161a56a0c'],
+  energy: ['1519823551278-64ac92734fb1','1571019613454-1cb2f99b2d8b','1559757148-5c350d0d3c56'],
+  aesthetics: ['1570172619644-dfd03ed5d881','1512621776951-a57141f2eefd','1559757148-5c350d0d3c56'],
+  general: ['1571019613454-1cb2f99b2d8b','1506126613408-eca07ce68773','1515377905703-c4788e51af15','1544161515-4ab6ce6db874'],
+};
+
+const KW_TO_KEY: Record<string, string> = {
+  sauna:'sauna', spa:'general', recovery:'healing', wellness:'general', clinic:'iv',
+  skincare:'aesthetics', athlete:'healing', fitness:'weight', healthy:'weight',
+  'spa,recovery':'healing', 'spa,skincare':'aesthetics', 'athlete,recovery':'healing',
+  'wellness,clinic':'iv', 'wellness,spa':'nad', 'fitness,healthy,lifestyle,wellness':'weight',
+  'wellness,massage':'pain', massage:'pain',
+};
+
 export function aiImageFor(keywords: string, seed: number): string[] {
-  const tags = (keywords || 'wellness,spa').trim();
-  const lock = Math.abs(seed || Date.now()) % 100000;
-  return [
-    `https://loremflickr.com/1080/1080/${encodeURIComponent(tags)}?lock=${lock}`,
-    `https://picsum.photos/seed/fw${lock}/1080/1080`,
-  ];
+  const kw = (keywords || 'wellness').trim();
+  const poolKey = KW_TO_KEY[kw] || 'general';
+  const pool = UNSPLASH_POOL[poolKey] || UNSPLASH_POOL.general;
+  const idx = Math.abs(seed || Date.now()) % pool.length;
+  const ordered = [pool[idx], ...pool.filter((_, i) => i !== idx)];
+  return ordered.map(id => `https://images.unsplash.com/photo-${id}?w=1080&h=1080&fit=crop&crop=entropy&auto=format&q=80`);
 }
 
 export function flatServices() {
