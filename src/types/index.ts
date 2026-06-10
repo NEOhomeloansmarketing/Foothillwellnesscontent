@@ -34,6 +34,18 @@ export interface GraphicContent {
   speed: string;
 }
 
+export interface TextOverlay {
+  id: string;
+  text: string;
+  x: number;   // position in 1080px space
+  y: number;
+  fontSize: number;
+  color: string;
+  bold: boolean;
+  italic: boolean;
+  fontFamily: 'serif' | 'sans';
+}
+
 export interface ContentPiece {
   id: string;
   createdAt: number;
@@ -54,6 +66,7 @@ export interface ContentPiece {
   channels: ChannelId[];
   status: StatusType;
   userImage?: boolean;
+  textOverlays?: TextOverlay[];
 }
 
 export interface ChatMessage {

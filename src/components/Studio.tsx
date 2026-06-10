@@ -6,7 +6,7 @@ import Btn from './ui/Btn';
 import GraphicCanvas, { TEMPLATES } from './graphic/GraphicCanvas';
 import { AUD } from '@/lib/content';
 import { useStore } from '@/store';
-import type { ContentPiece, ChannelId, ChatMessage, FiveLaw } from '@/types';
+import type { ContentPiece, ChannelId, ChatMessage, FiveLaw, TextOverlay } from '@/types';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function fmtDate(ts: number) {
@@ -297,12 +297,31 @@ interface CanvasProps {
 function CanvasPanel({ current, img, imgPos, onImgPos, onEditField, onUpdate, onExport, onToast, chans, onChans, onSave }: CanvasProps) {
   const [showCaption, setShowCaption] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [selectedOverlay, setSelectedOverlay] = useState<string | null>(null);
+  const [canvasSize, setCanvasSize] = useState(460);
   const dragStart = useRef<{ x: number; y: number; px: number; py: number } | null>(null);
+  const overlayDragStart = useRef<{ x: number; y: number; ox: number; oy: number; id: string } | null>(null);
   const frameRef = useRef<HTMLDivElement>(null);
-  const CANVAS_DISPLAY = 500;
+  const canvasAreaRef = useRef<HTMLDivElement>(null);
   const hasImg = !!img;
+  const overlays: TextOverlay[] = current.textOverlays || [];
 
+  // Responsive canvas size
+  useEffect(() => {
+    const el = canvasAreaRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(entries => {
+      const { width, height } = entries[0].contentRect;
+      const size = Math.min(Math.floor(Math.min(width - 40, height - 56)), 500);
+      setCanvasSize(Math.max(size, 280));
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  // Image drag
   function onMouseDown(e: React.MouseEvent) {
+    if (overlayDragStart.current) return;
     if (!hasImg) return;
     setIsDragging(true);
     dragStart.current = { x: e.clientX, y: e.clientY, px: imgPos.x, py: imgPos.y };
@@ -310,29 +329,67 @@ function CanvasPanel({ current, img, imgPos, onImgPos, onEditField, onUpdate, on
   }
 
   const onMouseMove = useCallback((e: MouseEvent) => {
+    if (overlayDragStart.current) {
+      const od = overlayDragStart.current;
+      const scale = canvasSize / 1080;
+      const dx = (e.clientX - od.x) / scale;
+      const dy = (e.clientY - od.y) / scale;
+      const nx = Math.max(0, Math.min(1080, od.ox + dx));
+      const ny = Math.max(0, Math.min(1080, od.oy + dy));
+      onUpdate({ ...current, textOverlays: overlays.map(o => o.id === od.id ? { ...o, x: Math.round(nx), y: Math.round(ny) } : o) });
+      return;
+    }
     if (!isDragging || !dragStart.current) return;
     const dx = e.clientX - dragStart.current.x;
     const dy = e.clientY - dragStart.current.y;
-    const sensitivity = 80 / CANVAS_DISPLAY; // smaller = more drag needed
+    const sensitivity = 80 / canvasSize;
     const nx = Math.max(0, Math.min(100, dragStart.current.px + dx * sensitivity));
     const ny = Math.max(0, Math.min(100, dragStart.current.py + dy * sensitivity));
     onImgPos({ x: Math.round(nx), y: Math.round(ny) });
-  }, [isDragging, onImgPos]);
+  }, [isDragging, canvasSize, onImgPos, overlays, current, onUpdate]);
 
-  const onMouseUp = useCallback(() => { setIsDragging(false); dragStart.current = null; }, []);
+  const onMouseUp = useCallback(() => {
+    setIsDragging(false);
+    dragStart.current = null;
+    overlayDragStart.current = null;
+  }, []);
 
   useEffect(() => {
-    if (isDragging) {
-      window.addEventListener('mousemove', onMouseMove);
-      window.addEventListener('mouseup', onMouseUp);
-    }
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
     return () => { window.removeEventListener('mousemove', onMouseMove); window.removeEventListener('mouseup', onMouseUp); };
-  }, [isDragging, onMouseMove, onMouseUp]);
+  }, [onMouseMove, onMouseUp]);
+
+  function addTextBox() {
+    const newOverlay: TextOverlay = {
+      id: 'txt' + Math.random().toString(36).slice(2, 7),
+      text: 'Add your text here',
+      x: 540, y: 540,
+      fontSize: 48,
+      color: '#ffffff',
+      bold: true,
+      italic: false,
+      fontFamily: 'sans',
+    };
+    onUpdate({ ...current, textOverlays: [...overlays, newOverlay] });
+    setSelectedOverlay(newOverlay.id);
+  }
+
+  function updateOverlay(id: string, patch: Partial<TextOverlay>) {
+    onUpdate({ ...current, textOverlays: overlays.map(o => o.id === id ? { ...o, ...patch } : o) });
+  }
+
+  function deleteOverlay(id: string) {
+    onUpdate({ ...current, textOverlays: overlays.filter(o => o.id !== id) });
+    setSelectedOverlay(null);
+  }
 
   const g = current.graphic;
+  const scale = canvasSize / 1080;
+  const sel = overlays.find(o => o.id === selectedOverlay);
 
   return (
-    <div className="ed-center">
+    <div className="ed-center" onClick={() => setSelectedOverlay(null)}>
       {/* Top info bar */}
       <div className="ed-center-bar">
         <div>
@@ -340,61 +397,122 @@ function CanvasPanel({ current, img, imgPos, onImgPos, onEditField, onUpdate, on
           <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 1 }}>{AUD[current.audience]} · {current.goal} · Instagram Post</div>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#eef6f0', border: '1px solid #d6ebdd', borderRadius: 999, padding: '5px 12px' }}>
-            <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#43a06a', boxShadow: '0 0 0 3px rgba(67,160,106,.2)' }} />
-            <span style={{ fontSize: 11, fontWeight: 700, color: '#2d6a4a' }}>Five-Laws Aligned</span>
-          </div>
+          <button onClick={addTextBox} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 700, color: 'var(--gold-muted)', background: 'var(--cream)', border: '1.5px solid var(--gold)', borderRadius: 8, padding: '6px 12px', cursor: 'pointer' }}>
+            <Icon n="plus" size={13} /> Add Text
+          </button>
           <Btn variant="navy" icon="download" onClick={onExport}>Export PNG</Btn>
         </div>
       </div>
 
-      {/* Canvas */}
-      <div className="ed-canvas-area">
+      {/* Canvas area — flex:1, measures itself */}
+      <div ref={canvasAreaRef} className="ed-canvas-area">
         <div
           ref={frameRef}
           className="ed-canvas-frame"
-          style={{
-            width: CANVAS_DISPLAY, height: CANVAS_DISPLAY,
-            cursor: hasImg ? (isDragging ? 'grabbing' : 'grab') : 'default',
-          }}
+          style={{ width: canvasSize, height: canvasSize, cursor: hasImg && !selectedOverlay ? (isDragging ? 'grabbing' : 'grab') : 'default' }}
           onMouseDown={onMouseDown}
+          onClick={e => e.stopPropagation()}
         >
-          <div className="ed-canvas-scaler" style={{ width: 1080, height: 1080, transform: `scale(${CANVAS_DISPLAY / 1080})`, transformOrigin: 'top left', position: 'absolute', top: 0, left: 0 }}>
+          {/* Graphic */}
+          <div style={{ width: 1080, height: 1080, transform: `scale(${scale})`, transformOrigin: 'top left', position: 'absolute', top: 0, left: 0 }}>
             <GraphicCanvas tpl={current.template} content={g} img={img} imgPos={imgPos} edit={{ on: true, set: onEditField }} />
           </div>
-          {/* Drag hint overlay when image loaded */}
-          {hasImg && !isDragging && (
+
+          {/* Text overlays */}
+          {overlays.map(o => (
+            <div
+              key={o.id}
+              onMouseDown={e => {
+                e.stopPropagation();
+                setSelectedOverlay(o.id);
+                overlayDragStart.current = { x: e.clientX, y: e.clientY, ox: o.x, oy: o.y, id: o.id };
+              }}
+              style={{
+                position: 'absolute',
+                left: o.x * scale,
+                top: o.y * scale,
+                transform: 'translate(-50%, -50%)',
+                cursor: 'move',
+                outline: selectedOverlay === o.id ? '2px solid #D1BB74' : '2px dashed rgba(209,187,116,.5)',
+                borderRadius: 4,
+                padding: '2px 4px',
+                zIndex: 10,
+              }}
+            >
+              <div
+                contentEditable
+                suppressContentEditableWarning
+                spellCheck={false}
+                onBlur={e => updateOverlay(o.id, { text: e.currentTarget.innerText.trim() || o.text })}
+                onKeyDown={e => { if (e.key === 'Escape') (e.currentTarget as HTMLElement).blur(); }}
+                style={{
+                  fontSize: o.fontSize * scale,
+                  color: o.color,
+                  fontFamily: o.fontFamily === 'serif' ? "'Playfair Display',serif" : "'Inter',sans-serif",
+                  fontWeight: o.bold ? 700 : 400,
+                  fontStyle: o.italic ? 'italic' : 'normal',
+                  whiteSpace: 'pre-wrap',
+                  minWidth: 80,
+                  outline: 'none',
+                  textShadow: '0 1px 4px rgba(0,0,0,.5)',
+                  cursor: 'text',
+                  userSelect: 'text',
+                }}
+              >{o.text}</div>
+            </div>
+          ))}
+
+          {/* Drag hint */}
+          {hasImg && !isDragging && !selectedOverlay && (
             <div style={{ position: 'absolute', top: 10, right: 10, background: 'rgba(1,24,54,.7)', backdropFilter: 'blur(4px)', borderRadius: 8, padding: '5px 10px', pointerEvents: 'none' }}>
               <span style={{ fontSize: 10.5, fontWeight: 600, color: 'rgba(255,255,255,.8)' }}>⟡ Drag to reposition photo</span>
             </div>
           )}
         </div>
 
-        <div style={{ fontSize: 11, color: 'var(--muted)', textAlign: 'center', marginTop: 8 }}>
-          <Icon n="edit" size={12} /> <b style={{ color: 'var(--navy-mid)' }}>Click any text</b> to edit it directly on the canvas
-        </div>
+        {/* Selected overlay toolbar */}
+        {sel && (
+          <div onClick={e => e.stopPropagation()} style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#fff', border: '1px solid var(--line)', borderRadius: 10, padding: '6px 12px', boxShadow: '0 4px 16px rgba(0,0,0,.1)', flexWrap: 'wrap', maxWidth: canvasSize }}>
+            <input type="color" value={sel.color} onChange={e => updateOverlay(sel.id, { color: e.target.value })}
+              style={{ width: 28, height: 28, border: 'none', borderRadius: 6, cursor: 'pointer', padding: 0 }} title="Color" />
+            <select value={sel.fontSize} onChange={e => updateOverlay(sel.id, { fontSize: +e.target.value })}
+              style={{ fontSize: 12, border: '1px solid var(--line)', borderRadius: 6, padding: '3px 6px', color: 'var(--text)' }}>
+              {[24,32,40,48,56,64,72,88,96,112].map(s => <option key={s} value={s}>{s}px</option>)}
+            </select>
+            <select value={sel.fontFamily} onChange={e => updateOverlay(sel.id, { fontFamily: e.target.value as 'serif' | 'sans' })}
+              style={{ fontSize: 12, border: '1px solid var(--line)', borderRadius: 6, padding: '3px 6px', color: 'var(--text)' }}>
+              <option value="sans">Sans</option>
+              <option value="serif">Serif</option>
+            </select>
+            <button onClick={() => updateOverlay(sel.id, { bold: !sel.bold })}
+              style={{ fontWeight: 700, fontSize: 13, padding: '3px 8px', borderRadius: 6, border: `1.5px solid ${sel.bold ? 'var(--navy-deep)' : 'var(--line)'}`, background: sel.bold ? 'var(--navy-deep)' : '#fff', color: sel.bold ? '#fff' : 'var(--text)', cursor: 'pointer' }}>B</button>
+            <button onClick={() => updateOverlay(sel.id, { italic: !sel.italic })}
+              style={{ fontStyle: 'italic', fontSize: 13, padding: '3px 8px', borderRadius: 6, border: `1.5px solid ${sel.italic ? 'var(--navy-deep)' : 'var(--line)'}`, background: sel.italic ? 'var(--navy-deep)' : '#fff', color: sel.italic ? '#fff' : 'var(--text)', cursor: 'pointer' }}>I</button>
+            <button onClick={() => deleteOverlay(sel.id)}
+              style={{ fontSize: 12, padding: '3px 8px', borderRadius: 6, border: '1.5px solid #fecaca', background: '#fef2f2', color: '#dc2626', cursor: 'pointer', marginLeft: 4 }}>
+              <Icon n="trash" size={13} />
+            </button>
+          </div>
+        )}
+
+        {!sel && <div style={{ fontSize: 11, color: 'var(--muted)', textAlign: 'center' }}>
+          <Icon n="edit" size={12} /> <b style={{ color: 'var(--navy-mid)' }}>Click any text</b> to edit · <b style={{ color: 'var(--navy-mid)' }}>Add Text</b> to add a custom box
+        </div>}
       </div>
 
-      {/* Template switcher — below canvas */}
-      <div style={{ padding: '14px 20px 0', borderTop: '1px solid var(--line-soft)', marginTop: 4 }}>
-        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--gold-muted)', marginBottom: 10 }}>Layout Template</div>
-        <div style={{ display: 'flex', gap: 10 }}>
+      {/* Template switcher */}
+      <div style={{ padding: '10px 16px 0', borderTop: '1px solid var(--line-soft)', flexShrink: 0 }}>
+        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--gold-muted)', marginBottom: 8 }}>Layout</div>
+        <div style={{ display: 'flex', gap: 8 }}>
           {TEMPLATES.map(t => (
-            <button key={t.id}
-              onClick={() => onUpdate({ ...current, template: t.id })}
-              style={{
-                flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
-                padding: '10px 6px', borderRadius: 12, cursor: 'pointer', transition: '.15s',
-                background: current.template === t.id ? 'var(--navy-deep)' : 'var(--cream)',
-                border: current.template === t.id ? '2px solid var(--gold)' : '1.5px solid var(--line)',
-                color: current.template === t.id ? 'var(--gold-cta)' : 'var(--navy-mid)',
-              }}>
-              <div style={{ width: 72, height: 72, position: 'relative', borderRadius: 8, overflow: 'hidden', background: 'var(--line-soft)', flexShrink: 0 }}>
-                <div style={{ position: 'absolute', top: 0, left: 0, width: 1080, height: 1080, transform: 'scale(.0667)', transformOrigin: 'top left', pointerEvents: 'none' }}>
+            <button key={t.id} onClick={() => onUpdate({ ...current, template: t.id })}
+              style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5, padding: '8px 4px', borderRadius: 10, cursor: 'pointer', transition: '.15s', background: current.template === t.id ? 'var(--navy-deep)' : 'var(--cream)', border: current.template === t.id ? '2px solid var(--gold)' : '1.5px solid var(--line)', color: current.template === t.id ? 'var(--gold-cta)' : 'var(--navy-mid)' }}>
+              <div style={{ width: 60, height: 60, position: 'relative', borderRadius: 7, overflow: 'hidden', background: 'var(--line-soft)', flexShrink: 0 }}>
+                <div style={{ position: 'absolute', top: 0, left: 0, width: 1080, height: 1080, transform: 'scale(.0556)', transformOrigin: 'top left', pointerEvents: 'none' }}>
                   <GraphicCanvas tpl={t.id} content={current.graphic} img={img} />
                 </div>
               </div>
-              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.06em', textAlign: 'center' }}>{t.name}</div>
+              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.05em', textAlign: 'center' }}>{t.name}</div>
             </button>
           ))}
         </div>
@@ -423,7 +541,6 @@ function CanvasPanel({ current, img, imgPos, onImgPos, onEditField, onUpdate, on
                 {current.hashtags.join('  ')}
               </span>
             </div>
-            {/* Alternate hooks */}
             <div style={{ marginTop: 12, borderTop: '1px solid var(--line-soft)', paddingTop: 12 }}>
               <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: 'var(--gold-muted)', marginBottom: 8 }}>Alternate Hooks (tap to use)</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>

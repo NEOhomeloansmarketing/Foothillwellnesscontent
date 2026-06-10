@@ -26,7 +26,7 @@ function Img({ srcs, pos }: { srcs: string[] | null; pos?: { x: number; y: numbe
 }
 
 function Logo({ h = 42, bright }: { h?: number; bright?: boolean }) {
-  return <img src="/foothill-logo.png" alt="" style={{ height: h, borderRadius: h * .1, display: 'block', filter: bright ? 'brightness(0) invert(1)' : undefined, opacity: bright ? .88 : 1 }} />;
+  return <img src="/foothill-logo.png" alt="" style={{ height: h, maxWidth: h * 5, objectFit: 'contain', display: 'block', filter: bright ? 'brightness(0) invert(1)' : undefined, opacity: bright ? .88 : 1 }} />;
 }
 
 function Stars({ size = 26 }: { size?: number }) {

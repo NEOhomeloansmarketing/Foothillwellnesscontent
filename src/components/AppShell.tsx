@@ -121,7 +121,7 @@ export default function AppShell() {
     <div className="app">
       <div className="topbar">
         <button className="brand" onClick={() => setView('home')} style={{ background: 'none' }}>
-          <Image src="/foothill-logo.png" alt="Foothill Wellness" width={34} height={34} style={{ borderRadius: 5 }} />
+          <Image src="/foothill-logo.png" alt="Foothill Wellness" width={120} height={34} style={{ objectFit: 'contain', height: 34, width: 'auto' }} />
           <span className="brandname">Content Studio<small>Foothill Wellness</small></span>
         </button>
         <div className="topnav">
