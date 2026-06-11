@@ -749,6 +749,7 @@ function PublishBar({ current, captureFrame, onSave, onToast, webhookUrl, onWebh
             setImageUrl(null);
             onSave({ ...current, channels: ['instagram', 'google'], status: 'posted', postedAt: Date.now() });
             onToast('Posted to Instagram ✓');
+            setTimeout(() => useStore.getState().setView('home'), 1200);
           }}
         />
       )}
