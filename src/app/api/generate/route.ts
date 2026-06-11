@@ -78,7 +78,7 @@ CAPTION STRUCTURE — write each section as its own short field:
 Each field is a plain string — short, human, no walls of text. Use "may help", "can support". No guaranteed results.
 
 Return this exact JSON schema (minified, no extras):
-{"hook":"≤65 chars — customer problem first, never service name","emphasis":"1-3 word phrase from hook to highlight","subhook":"one warm sentence bridging problem to service — use 'you'","caption":{"problem":"","empathy":"","pivot":"","hope":"","service":"","proof":"","ease":"","cta":"📞 Call or text (801) 784-0095 · Foothill Wellness, Salt Lake City"},"hashtags":["8 relevant hashtags"]}`;
+{"hook":"≤65 chars — customer problem first, never service name — e.g. 'Still sore days after your workout?'","emphasis":"1-3 word phrase from hook to highlight in gold","subhook":"TWO short lines separated by \\n — Line 1: empathy (acknowledge the pain) — Line 2: solution naming the service — e.g. 'Your body was built to recover.\\nCryotherapy helps it heal faster.'","caption":{"problem":"","empathy":"","pivot":"","hope":"","service":"","proof":"","ease":"","cta":"📞 Call or text (801) 784-0095 · Foothill Wellness, Salt Lake City"},"hashtags":["8 relevant hashtags"]}`;
 
   const forbiddenStarts = [
     service.toLowerCase().split(' ')[0],
