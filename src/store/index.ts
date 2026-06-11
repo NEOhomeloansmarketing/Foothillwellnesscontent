@@ -7,6 +7,7 @@ import { seedProjects } from '@/lib/content';
 export interface Webhooks {
   instagram?: string;
   google?: string;
+  email?: string;
 }
 
 interface AppStore {

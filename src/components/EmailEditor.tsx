@@ -2,6 +2,7 @@
 import { useState, useRef } from 'react';
 import type { ContentPiece, EmailContent } from '@/types';
 import { getReviewsForService } from '@/lib/testimonials';
+import { useStore } from '@/store';
 
 interface Props {
   current: ContentPiece;
@@ -83,7 +84,12 @@ export default function EmailEditor({ current, onUpdate, onToast }: Props) {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiHistory, setAiHistory] = useState<{ role: 'user' | 'ai'; text: string }[]>([]);
   const [ghlSending, setGhlSending] = useState(false);
+  const [editingWebhook, setEditingWebhook] = useState(false);
+  const [webhookDraft, setWebhookDraft] = useState('');
   const feedRef = useRef<HTMLDivElement>(null);
+  const webhooks = useStore(s => s.webhooks);
+  const setWebhooks = useStore(s => s.setWebhooks);
+  const emailWebhook = webhooks.email;
 
   const ec = current.emailContent ?? {
     subject: '', previewText: '', opening: '', empathy: '',
@@ -112,23 +118,32 @@ export default function EmailEditor({ current, onUpdate, onToast }: Props) {
     onToast(`Review updated — ${review.name}`);
   }
 
-  async function sendToGHL() {
+  async function sendToZapier() {
     if (ghlSending) return;
+    if (!emailWebhook) { setEditingWebhook(true); setWebhookDraft(''); onToast('Paste your Zapier webhook URL first'); return; }
     setGhlSending(true);
     try {
-      const res = await fetch('/api/ghl-campaign', {
+      const payload = {
+        title: current.title,
+        subject: ec.subject,
+        previewText: ec.previewText,
+        body: assembleFullEmail(ec),
+        html: `Hello,\n\n${ec.opening}\n\n${ec.empathy}\n\n${ec.explanation}\n\n${ec.proof}\n\n${ec.speed}\n\n${ec.ease}\n\n${ec.cta}\n\n${ec.closing}${ec.ps ? `\n\nP.S. ${ec.ps}` : ''}`,
+        service: current.service,
+      };
+      const res = await fetch('/api/webhook', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: ec, title: current.title }),
+        body: JSON.stringify({ webhookUrl: emailWebhook, payload }),
       });
       const json = await res.json();
       if (json.ok) {
-        onToast('Draft campaign created in Go High Level!');
+        onToast('Email sent to Zapier — campaign on its way!');
       } else {
-        onToast(`GHL error: ${json.error ?? 'Unknown error'}`);
+        onToast(`Zapier error: ${json.body ?? 'Unknown error'}`);
       }
     } catch {
-      onToast('Network error — could not reach GHL');
+      onToast('Network error — could not reach Zapier');
     }
     setGhlSending(false);
   }
@@ -296,13 +311,13 @@ export default function EmailEditor({ current, onUpdate, onToast }: Props) {
               Copy
             </button>
             <button
-              onClick={sendToGHL}
+              onClick={sendToZapier}
               disabled={ghlSending || isLoading}
-              title="Send as draft campaign in Go High Level"
+              title={emailWebhook ? 'Send to Zapier → GHL' : 'Connect Zapier webhook first'}
               style={{
                 fontSize: 11, fontWeight: 700, flexShrink: 0,
                 color: ghlSending || isLoading ? 'var(--muted)' : '#fff',
-                background: ghlSending || isLoading ? 'var(--line-soft)' : 'var(--navy-deep)',
+                background: ghlSending || isLoading ? 'var(--line-soft)' : emailWebhook ? 'var(--navy-deep)' : 'var(--gold)',
                 border: 'none', borderRadius: 7, padding: '6px 10px',
                 cursor: ghlSending || isLoading ? 'not-allowed' : 'pointer',
                 display: 'flex', alignItems: 'center', gap: 5,
@@ -310,10 +325,34 @@ export default function EmailEditor({ current, onUpdate, onToast }: Props) {
             >
               {ghlSending
                 ? <><div className="spin" style={{ width: 12, height: 12, borderWidth: 2 }} /> Sending…</>
-                : '↑ GHL Draft'}
+                : emailWebhook ? '↑ Send to GHL' : '⚡ Connect Zapier'}
             </button>
           </div>
         </div>
+
+        {/* Webhook config bar */}
+        {editingWebhook ? (
+          <div style={{ display: 'flex', gap: 6, padding: '8px 12px', borderBottom: '1px solid var(--line)', background: 'var(--cream)', flexShrink: 0 }}>
+            <input
+              autoFocus
+              value={webhookDraft}
+              onChange={e => setWebhookDraft(e.target.value)}
+              placeholder="https://hooks.zapier.com/hooks/catch/…"
+              style={{ flex: 1, fontSize: 11.5, padding: '6px 10px', borderRadius: 7, border: '1.5px solid var(--line)', background: '#fff', color: 'var(--navy-mid)', fontFamily: 'inherit' }}
+            />
+            <button onClick={() => { setWebhooks({ email: webhookDraft.trim() }); setEditingWebhook(false); onToast('Email webhook saved'); }}
+              style={{ fontSize: 11, fontWeight: 700, background: 'var(--navy-deep)', color: 'var(--gold-cta)', border: 'none', borderRadius: 7, padding: '6px 10px', cursor: 'pointer' }}>Save</button>
+            <button onClick={() => setEditingWebhook(false)}
+              style={{ fontSize: 11, background: 'var(--line-soft)', color: 'var(--muted)', border: 'none', borderRadius: 7, padding: '6px 8px', cursor: 'pointer' }}>✕</button>
+          </div>
+        ) : emailWebhook ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderBottom: '1px solid var(--line)', background: 'var(--cream)', flexShrink: 0 }}>
+            <span style={{ fontSize: 10, color: '#16a34a', fontWeight: 700 }}>⚡ Zapier connected</span>
+            <span style={{ fontSize: 10, color: 'var(--muted)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{emailWebhook}</span>
+            <button onClick={() => { setWebhookDraft(emailWebhook); setEditingWebhook(true); }}
+              style={{ fontSize: 10, fontWeight: 700, color: 'var(--navy-mid)', background: 'none', border: 'none', cursor: 'pointer', flexShrink: 0 }}>Update</button>
+          </div>
+        ) : null}
 
         {/* AI TAB */}
         {tab === 'ai' && (
