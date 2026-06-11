@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
     const { email, title } = await req.json() as { email: EmailContent; title: string };
     const html = buildHtml(email);
 
-    // Create email campaign draft in GHL
+    // Create email template in GHL (campaigns API not in public spec)
     const body = {
       name: title || email.subject,
       subject: email.subject,
@@ -77,11 +77,9 @@ export async function POST(req: NextRequest) {
       replyToEmail: 'info@foothillwellness.com',
       html,
       locationId,
-      status: 'draft',
-      sendToAll: true,
     };
 
-    const res = await fetch(`${GHL_BASE}/email-marketing/campaigns`, {
+    const res = await fetch(`${GHL_BASE}/email-marketing/templates`, {
       method: 'POST',
       headers: ghlHeaders(),
       body: JSON.stringify(body),
