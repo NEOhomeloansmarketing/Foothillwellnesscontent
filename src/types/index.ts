@@ -80,6 +80,29 @@ export interface ContentPiece {
   textPositions?: Record<string, { x: number; y: number }>;
   postedAt?: number;       // unix ms when the post was sent to Zapier
   emailContent?: EmailContent;
+  flyerContent?: FlyerContent;
+}
+
+export interface FlyerBenefit {
+  icon: string;   // emoji or short text
+  title: string;
+  desc: string;
+}
+
+export interface FlyerStat {
+  value: string;
+  label: string;
+}
+
+export interface FlyerContent {
+  template: 'split' | 'hero' | 'checklist';
+  headline: string;
+  subheadline: string;
+  description: string;
+  benefits: FlyerBenefit[];
+  stats: FlyerStat[];
+  tagline: string;
+  cta: string;
 }
 
 export interface EmailContent {

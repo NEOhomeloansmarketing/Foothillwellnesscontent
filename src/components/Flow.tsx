@@ -103,7 +103,7 @@ export default function Flow({ onClose, onGenerate, contentType = 'ig-post' }: F
 
         <div className="flow-body">
           {step === 0 && <>
-            <div className="eyebrow q-eyebrow">{contentType === 'email' ? 'Email Campaign · Step 1 of 3' : 'Instagram Post · Step 1 of 3'}</div>
+            <div className="eyebrow q-eyebrow">{contentType === 'email' ? 'Email Campaign · Step 1 of 3' : contentType === 'flyer' ? 'Print Flyer · Step 1 of 3' : 'Instagram Post · Step 1 of 3'}</div>
             <h3 className="serif">Which service are we highlighting?</h3>
             <p className="q-sub">Pick the one treatment this piece should feature. We'll lead with the client's problem first — never the treatment menu.</p>
 
@@ -222,7 +222,7 @@ export default function Flow({ onClose, onGenerate, contentType = 'ig-post' }: F
               <label>{isEvent ? 'Anything else to add' : 'Tell the studio what you want'} <span style={{ textTransform: 'none', color: 'var(--muted)', fontWeight: 400 }}>(optional)</span></label>
               <textarea rows={3} placeholder={isEvent ? 'e.g. keep it exciting, urgency on limited spots…' : 'e.g. promote our buy-5-get-1 IV deal, feature Allie, keep it warm and local, lead with better sleep…'} value={notes} onChange={e => setNotes(e.target.value)} />
             </div>
-            {contentType !== 'email' && (
+            {contentType !== 'email' && contentType !== 'flyer' && (
               <div className="field" style={{ marginTop: 18 }}>
                 <label>Use your own photo <span style={{ textTransform: 'none', color: 'var(--muted)', fontWeight: 400 }}>(optional — otherwise we'll auto-pick one)</span></label>
                 <input ref={photoRef} type="file" accept="image/*" hidden onChange={onPhoto} />

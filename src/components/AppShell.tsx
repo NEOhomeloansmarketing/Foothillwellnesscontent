@@ -10,7 +10,7 @@ import Calendar from './Calendar';
 import { useStore } from '@/store';
 import { bakedGenerate } from '@/lib/content';
 import { contentTypes } from '@/lib/brand';
-import type { ContentPiece, GenerateOptions, EmailContent } from '@/types';
+import type { ContentPiece, GenerateOptions, EmailContent, FlyerContent } from '@/types';
 
 export default function AppShell() {
   const {
@@ -20,6 +20,7 @@ export default function AppShell() {
   } = useStore();
 
   const [emailFlowOpen, setEmailFlowOpen] = useState(false);
+  const [flyerFlowOpen, setFlyerFlowOpen] = useState(false);
   const toastT = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   function showToast(msg: string) {
@@ -31,6 +32,7 @@ export default function AppShell() {
   function pick(type: string) {
     if (type === 'library') { if (!current && projects.length) setCurrent(projects[0]); setView('studio'); return; }
     if (type === 'email') { setEmailFlowOpen(true); return; }
+    if (type === 'flyer') { setFlyerFlowOpen(true); return; }
     if (type !== 'ig-post') {
       const ct = contentTypes.find(t => t.id === type);
       showToast((ct?.label || type) + ' is coming soon — Instagram Post is ready now');
@@ -179,6 +181,68 @@ export default function AppShell() {
     }
   }
 
+  async function runGenerateFlyer(opts: GenerateOptions) {
+    setFlyerFlowOpen(false);
+    setView('studio');
+    setGenerating(true);
+    setCurrent(null);
+
+    const audienceShort: Record<string, string> = { pain: 'Pain', healing: 'Recovery', weight: 'Weight', energy: 'Energy' };
+    const projId = 'p' + Math.random().toString(36).slice(2, 8);
+
+    const placeholderFlyer: FlyerContent = {
+      template: 'split',
+      headline: 'LOADING…',
+      subheadline: '',
+      description: '',
+      benefits: [],
+      stats: [],
+      tagline: 'Feel Better Faster',
+      cta: '(801) 784-0095',
+    };
+
+    const proj: ContentPiece = {
+      id: projId,
+      createdAt: Date.now(),
+      channels: [],
+      status: 'draft',
+      contentType: 'flyer',
+      title: `${opts.service} · Flyer${opts.audience ? ' · ' + (audienceShort[opts.audience] ?? opts.audience) : ''}`,
+      service: opts.service,
+      audience: opts.audience,
+      goal: opts.goal,
+      template: 'educate',
+      graphic: { eyebrow: '', hook: '', emphasis: '', subhook: '', ctaShort: '', quote: '', proofName: '', proofMeta: '', title: '', tagline: '', problemHook: '', problemEmphasis: '', problemDesc: '', aspiration: '', benefits: [], speed: '' },
+      caption: '',
+      hashtags: [],
+      fiveLaws: [],
+      autoImage: null,
+      imgKeywords: '',
+      altHooks: [],
+      proofUsed: '',
+      flyerContent: placeholderFlyer,
+    };
+
+    addProject(proj);
+    setGenerating(false);
+
+    try {
+      const res = await fetch('/api/generate-flyer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ service: opts.service, audience: opts.audience, goal: opts.goal, notes: opts.notes }),
+      });
+      const json = await res.json();
+      if (json.ok && json.data) {
+        updateProject({ ...proj, flyerContent: { ...json.data, template: 'split' } as FlyerContent });
+      } else {
+        showToast('Flyer generation failed — try again');
+      }
+    } catch {
+      showToast('Network error generating flyer');
+    }
+  }
+
   function openProject(p: ContentPiece) {
     setCurrent(p);
     setView('studio');
@@ -220,6 +284,7 @@ export default function AppShell() {
 
       {flowOpen && <Flow onClose={() => setFlowOpen(false)} onGenerate={runGenerate} />}
       {emailFlowOpen && <Flow contentType="email" onClose={() => setEmailFlowOpen(false)} onGenerate={runGenerateEmail} />}
+      {flyerFlowOpen && <Flow contentType="flyer" onClose={() => setFlyerFlowOpen(false)} onGenerate={runGenerateFlyer} />}
 
       {postSuccess && (
         <div style={{

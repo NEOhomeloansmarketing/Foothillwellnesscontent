@@ -9,6 +9,7 @@ import SocialPreview from './SocialPreview';
 import { AUD } from '@/lib/content';
 import { useStore } from '@/store';
 import EmailEditor from './EmailEditor';
+import FlyerEditor from './FlyerEditor';
 import type { ContentPiece, ChannelId, ChatMessage, FiveLaw, TextOverlay } from '@/types';
 import type { Webhooks } from '@/store';
 
@@ -1173,11 +1174,20 @@ export default function Studio({ projects, current, generating, onSelect, onUpda
   if (current.contentType === 'email') {
     return (
       <div className="ed-layout">
-        <LeftPanel
-          projects={projects} current={current} onSelect={p => { onSelect(p); onUpdate(p); }} onPick={onPick}
-        />
+        <LeftPanel projects={projects} current={current} onSelect={p => { onSelect(p); onUpdate(p); }} onPick={onPick} />
         <div style={{ gridColumn: '2 / -1', display: 'flex', overflow: 'hidden' }}>
           <EmailEditor current={current} onUpdate={onUpdate} onToast={onToast} />
+        </div>
+      </div>
+    );
+  }
+
+  if (current.contentType === 'flyer') {
+    return (
+      <div className="ed-layout">
+        <LeftPanel projects={projects} current={current} onSelect={p => { onSelect(p); onUpdate(p); }} onPick={onPick} />
+        <div style={{ gridColumn: '2 / -1', display: 'flex', overflow: 'hidden' }}>
+          <FlyerEditor current={current} onUpdate={onUpdate} onToast={onToast} />
         </div>
       </div>
     );
