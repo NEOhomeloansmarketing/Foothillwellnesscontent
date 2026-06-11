@@ -237,19 +237,16 @@ export default function EmailEditor({ current, onUpdate, onToast }: Props) {
                     style={{ fontSize: 15, lineHeight: 1.75, color: '#3a4a6a', marginBottom: 22, display: 'block' }} placeholder="Ease paragraph…" />
 
                   <div style={{ background: '#011836', borderRadius: 10, padding: '16px 22px', marginBottom: 22, textAlign: 'center' }}>
-                    <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.12em', textTransform: 'uppercase', color: 'rgba(201,168,76,.5)', marginBottom: 6 }}>Call to Action</div>
                     <EditableBlock value={ec.cta} fieldKey="cta" onSave={v => update('cta', v)}
                       style={{ color: '#C9A84C', fontWeight: 700, fontSize: 15, display: 'block' }} placeholder="Call to action…" />
                   </div>
 
-                  <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--gold-muted)', marginBottom: 6 }}>Closing</div>
                   <EditableBlock value={ec.closing} fieldKey="closing" onSave={v => update('closing', v)}
                     style={{ fontSize: 14, lineHeight: 1.7, color: '#3a4a6a', display: 'block', whiteSpace: 'pre-line' }} placeholder="Warm sign-off…" />
 
                   {(ec.ps || ec.ps === '') && (
                     <>
                       <div style={{ height: 1, background: '#e8e4da', margin: '18px 0 14px' }} />
-                      <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--gold-muted)', marginBottom: 6 }}>P.S.</div>
                       <EditableBlock value={ec.ps ?? ''} fieldKey="ps" onSave={v => update('ps', v)}
                         style={{ fontSize: 13, lineHeight: 1.6, color: '#6b7a99', fontStyle: 'italic', display: 'block' }} placeholder="Optional P.S. line…" />
                     </>
