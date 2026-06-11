@@ -306,30 +306,101 @@ function CanvasPanel({ current, img, imgPos, onImgPos, onEditField, onUpdate, on
   const hasImg = !!img;
   const overlays: TextOverlay[] = current.textOverlays || [];
 
-  // Capture the live rendered canvas frame at 1080px.
-  // skipFonts=true avoids fetching Google Fonts CDN (the root cause of the previous hangs).
+  // Pure Canvas 2D export — reads already-loaded base64 data URLs, zero network requests, never hangs.
   async function captureFrame(): Promise<string | null> {
-    const el = frameRef.current;
-    if (!el) return null;
-    try {
-      const { toPng } = await import('html-to-image');
-      const pixelRatio = 1080 / canvasSize;
-      const dataUrl = await Promise.race([
-        toPng(el, {
-          pixelRatio,
-          cacheBust: false,
-          skipFonts: true,  // don't fetch Google Fonts CDN — use system fallbacks in export
-          style: { transform: 'none' },
-        }),
-        new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('capture timed out')), 20000)
-        ),
-      ]);
-      return dataUrl;
-    } catch (e) {
-      console.error('captureFrame failed:', e);
-      return null;
+    const SIZE = 1080;
+    const canvas = document.createElement('canvas');
+    canvas.width = SIZE;
+    canvas.height = SIZE;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+
+    // 1. Background photo (img is already a base64 data URL from DALL-E or file upload)
+    const imgSrc = Array.isArray(img) ? img[0] : img;
+    if (imgSrc) {
+      await new Promise<void>(resolve => {
+        const image = new window.Image();
+        image.onload = () => {
+          const scale = Math.max(SIZE / image.naturalWidth, SIZE / image.naturalHeight);
+          const sw = image.naturalWidth * scale;
+          const sh = image.naturalHeight * scale;
+          const ox = (SIZE - sw) * (imgPos.x / 100);
+          const oy = (SIZE - sh) * (imgPos.y / 100);
+          ctx.drawImage(image, ox, oy, sw, sh);
+          resolve();
+        };
+        image.onerror = () => resolve();
+        image.src = imgSrc;
+      });
+    } else {
+      ctx.fillStyle = '#011836';
+      ctx.fillRect(0, 0, SIZE, SIZE);
     }
+
+    // 2. Gradient overlay (matches full-bleed photo template)
+    const grad = ctx.createLinearGradient(0, 0, 0, SIZE);
+    grad.addColorStop(0,    'rgba(1,24,54,0.72)');
+    grad.addColorStop(0.35, 'rgba(1,24,54,0.08)');
+    grad.addColorStop(0.5,  'rgba(1,24,54,0)');
+    grad.addColorStop(0.68, 'rgba(1,24,54,0.55)');
+    grad.addColorStop(1,    'rgba(1,24,54,0.98)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, SIZE, SIZE);
+
+    // 3. Gold accent bar
+    ctx.fillStyle = '#D1BB74';
+    ctx.beginPath();
+    ctx.roundRect(56, SIZE - 310, 60, 4, 2);
+    ctx.fill();
+
+    // 4. Hook text
+    const g = current.graphic;
+    const hook = g.hook || '';
+    const hookLen = hook.length;
+    const hookSize = hookLen <= 14 ? 96 : hookLen >= 55 ? 52 : Math.round(96 - (96 - 52) * (hookLen - 14) / 41);
+    ctx.font = `800 ${hookSize}px serif`;
+    ctx.fillStyle = '#ffffff';
+    ctx.textBaseline = 'alphabetic';
+    const hookY = canvasWrapText(ctx, hook, 56, SIZE - 300, SIZE - 112, hookSize * 1.0);
+
+    // 5. Subhook text
+    if (g.subhook) {
+      ctx.font = '300 26px sans-serif';
+      ctx.fillStyle = 'rgba(255,255,255,0.84)';
+      canvasWrapText(ctx, g.subhook, 56, hookY + 28, SIZE - 112, 38);
+    }
+
+    // 6. CTA pill (simple text line at bottom)
+    ctx.font = 'bold 22px sans-serif';
+    ctx.fillStyle = '#011836';
+    const pillW = 560, pillH = 56, pillX = 56, pillY = SIZE - 80;
+    ctx.fillStyle = '#D1BB74';
+    ctx.beginPath();
+    ctx.roundRect(pillX, pillY, pillW, pillH, 28);
+    ctx.fill();
+    ctx.fillStyle = '#011836';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('📞 Call or text (801) 784-0095', pillX + 24, pillY + pillH / 2);
+
+    return canvas.toDataURL('image/png');
+  }
+
+  function canvasWrapText(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, maxW: number, lineH: number): number {
+    const words = text.split(' ');
+    let line = '';
+    let cy = y;
+    for (const word of words) {
+      const test = line ? line + ' ' + word : word;
+      if (ctx.measureText(test).width > maxW && line) {
+        ctx.fillText(line, x, cy);
+        cy += lineH;
+        line = word;
+      } else {
+        line = test;
+      }
+    }
+    if (line) { ctx.fillText(line, x, cy); cy += lineH; }
+    return cy;
   }
 
   // Responsive canvas size
