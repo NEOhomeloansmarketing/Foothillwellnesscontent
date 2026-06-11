@@ -54,10 +54,12 @@ export default function SocialPreview({ imageUrl, caption, hashtags, service, we
       const data = await res.json();
       if (!data.ok) throw new Error(data.error || `Zapier returned ${data.status}: ${data.body}`);
 
-      // Show success screen, then navigate to calendar
+      // Show success screen first — delay onPosted so it doesn't unmount this component
       setPosted(true);
-      onPosted();
-      setTimeout(() => setView('calendar'), 2000);
+      setTimeout(() => {
+        onPosted();
+        setView('calendar');
+      }, 2000);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to send — check your Zapier webhook');
     } finally {

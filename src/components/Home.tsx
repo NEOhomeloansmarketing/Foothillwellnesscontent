@@ -100,7 +100,7 @@ export default function Home({ projects, onPick, onOpen }: HomeProps) {
             {recents.map(p => (
               <button key={p.id} className="proj-card" onClick={() => onOpen(p)}>
                 <div className="proj-thumb">
-                  <div style={{ position: 'absolute', top: 0, left: 0, width: 1080, height: 1080, transform: 'scale(.2315)', transformOrigin: 'top left' }}>
+                  <div style={{ position: 'absolute', top: 0, left: 0, width: 1080, height: 1080, transform: 'scale(.2315)', transformOrigin: 'top left', pointerEvents: 'none' }}>
                     <GraphicCanvas tpl={p.template} content={p.graphic} />
                   </div>
                   <span className="tag" style={{

@@ -28,7 +28,7 @@ export default function AppShell() {
   }
 
   function pick(type: string) {
-    if (type === 'library') { setView('studio'); return; }
+    if (type === 'library') { if (!current && projects.length) setCurrent(projects[0]); setView('studio'); return; }
     if (type !== 'ig-post') {
       const ct = contentTypes.find(t => t.id === type);
       showToast((ct?.label || type) + ' is coming soon — Instagram Post is ready now');
