@@ -966,15 +966,29 @@ export default function Studio({ projects, current, generating, onSelect, onUpda
       const { toPng } = await import('html-to-image');
       const node = document.getElementById('export-canvas');
       if (!node) return null;
-      const opts = {
-        width: 1080, height: 1080, pixelRatio: 1,
-        skipFonts: true, cacheBust: false, includeQueryParams: false,
-      };
-      // Race each pass against a 7s timeout so a stalled fetch never freezes the UI
-      const withTimeout = (p: Promise<string>) =>
-        Promise.race([p, new Promise<string>((_, rej) => setTimeout(() => rej(new Error('timeout')), 7000))]);
-      await withTimeout(toPng(node, opts)).catch(() => {});   // warm image cache
-      return await withTimeout(toPng(node, opts)).catch(() => null);
+
+      // Pre-inline every <img> as a base64 data URL so html-to-image makes zero
+      // network fetches. External fetches are what causes the indefinite hang.
+      const imgs = Array.from(node.querySelectorAll<HTMLImageElement>('img'));
+      const origSrcs = imgs.map(img => img.src);
+      await Promise.all(imgs.map(async img => {
+        if (!img.src || img.src.startsWith('data:') || img.src.startsWith('blob:')) return;
+        try {
+          const blob = await fetch(img.src).then(r => r.blob());
+          await new Promise<void>(resolve => {
+            const reader = new FileReader();
+            reader.onload = () => { img.src = reader.result as string; resolve(); };
+            reader.readAsDataURL(blob);
+          });
+        } catch { /* keep original if fetch fails */ }
+      }));
+
+      const opts = { width: 1080, height: 1080, pixelRatio: 1, skipFonts: true };
+      const result = await toPng(node, opts).catch(() => null);
+
+      // Restore original srcs so the live canvas still works
+      imgs.forEach((img, i) => { img.src = origSrcs[i]; });
+      return result;
     } catch { return null; }
   }
 
