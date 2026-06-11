@@ -33,6 +33,14 @@ export default function Flow({ onClose, onGenerate, contentType = 'ig-post' }: F
   const [photo, setPhoto] = useState<string | null>(null);
   const [q, setQ] = useState('');
   const photoRef = useRef<HTMLInputElement>(null);
+  // Event-specific fields
+  const [eventName, setEventName] = useState('');
+  const [eventDate, setEventDate] = useState('');
+  const [eventTime, setEventTime] = useState('');
+  const [eventLocation, setEventLocation] = useState('');
+  const [eventDesc, setEventDesc] = useState('');
+
+  const isEvent = service?.name === 'Event';
 
   const services = useMemo(() => flatServices(), []);
   const filtered = q ? services.filter(s => (s.name + s.cat).toLowerCase().includes(q.toLowerCase())) : services;
@@ -42,7 +50,19 @@ export default function Flow({ onClose, onGenerate, contentType = 'ig-post' }: F
 
   function next() {
     if (last) {
-      onGenerate({ contentType, service: service!.name, audience: audience!, goal, notes, userImage: photo });
+      let finalNotes = notes;
+      if (isEvent) {
+        const parts = [
+          eventName && `Event: ${eventName}`,
+          eventDate && `Date: ${eventDate}`,
+          eventTime && `Time: ${eventTime}`,
+          eventLocation && `Location: ${eventLocation}`,
+          eventDesc && `Details: ${eventDesc}`,
+          notes && notes,
+        ].filter(Boolean);
+        finalNotes = parts.join(' | ');
+      }
+      onGenerate({ contentType, service: service!.name, audience: audience!, goal, notes: finalNotes, userImage: photo });
     } else {
       setStep(step + 1);
     }
@@ -73,6 +93,20 @@ export default function Flow({ onClose, onGenerate, contentType = 'ig-post' }: F
             <div className="eyebrow q-eyebrow">{contentType === 'email' ? 'Email Campaign · Step 1 of 3' : 'Instagram Post · Step 1 of 3'}</div>
             <h3 className="serif">Which service are we highlighting?</h3>
             <p className="q-sub">Pick the one treatment this piece should feature. We'll lead with the client's problem first — never the treatment menu.</p>
+
+            {/* Event shortcut */}
+            <button
+              className={`svc ${service?.name === 'Event' ? 'on' : ''}`}
+              onClick={() => setService({ cat: 'Special', name: 'Event' })}
+              style={{ width: '100%', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px' }}
+            >
+              <div style={{ fontSize: 18 }}>📅</div>
+              <div>
+                <div className="sc-cat">Special</div>
+                <div className="sc-name">Event — promote an upcoming event with details</div>
+              </div>
+            </button>
+
             <div className="svc-search">
               <div className="hist-search" style={{ margin: 0 }}>
                 <Icon n="search" size={16} />
@@ -118,9 +152,36 @@ export default function Flow({ onClose, onGenerate, contentType = 'ig-post' }: F
                 </button>
               ))}
             </div>
+            {isEvent && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 20 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--gold-muted)' }}>Event Details</div>
+                <div className="field" style={{ margin: 0 }}>
+                  <label>Event name <span style={{ textTransform: 'none', color: 'var(--red, #e55)', fontWeight: 400 }}>*</span></label>
+                  <input placeholder="e.g. Wellness Wednesday Open House" value={eventName} onChange={e => setEventName(e.target.value)} />
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  <div className="field" style={{ margin: 0 }}>
+                    <label>Date</label>
+                    <input type="date" value={eventDate} onChange={e => setEventDate(e.target.value)} />
+                  </div>
+                  <div className="field" style={{ margin: 0 }}>
+                    <label>Time</label>
+                    <input type="time" value={eventTime} onChange={e => setEventTime(e.target.value)} />
+                  </div>
+                </div>
+                <div className="field" style={{ margin: 0 }}>
+                  <label>Location <span style={{ textTransform: 'none', color: 'var(--muted)', fontWeight: 400 }}>(optional)</span></label>
+                  <input placeholder="e.g. Foothill Wellness, 1414 S Foothill Dr" value={eventLocation} onChange={e => setEventLocation(e.target.value)} />
+                </div>
+                <div className="field" style={{ margin: 0 }}>
+                  <label>What's happening / any offers</label>
+                  <textarea rows={2} placeholder="e.g. Free 15-min cryo demo, 20% off packages, meet the team…" value={eventDesc} onChange={e => setEventDesc(e.target.value)} />
+                </div>
+              </div>
+            )}
             <div className="field">
-              <label>Tell the studio what you want <span style={{ textTransform: 'none', color: 'var(--muted)', fontWeight: 400 }}>(optional)</span></label>
-              <textarea rows={3} placeholder="e.g. promote our buy-5-get-1 IV deal, feature Allie, keep it warm and local, lead with better sleep…" value={notes} onChange={e => setNotes(e.target.value)} />
+              <label>{isEvent ? 'Anything else to add' : 'Tell the studio what you want'} <span style={{ textTransform: 'none', color: 'var(--muted)', fontWeight: 400 }}>(optional)</span></label>
+              <textarea rows={3} placeholder={isEvent ? 'e.g. keep it exciting, urgency on limited spots…' : 'e.g. promote our buy-5-get-1 IV deal, feature Allie, keep it warm and local, lead with better sleep…'} value={notes} onChange={e => setNotes(e.target.value)} />
             </div>
             {contentType !== 'email' && (
               <div className="field" style={{ marginTop: 18 }}>

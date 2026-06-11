@@ -29,6 +29,7 @@ function buildHtml(ec: EmailContent): string {
       </td></tr>
       <!-- Body -->
       <tr><td style="padding:32px 40px 24px;color:#1a2540;">
+        <p style="font-size:15px;line-height:1.75;margin:0 0 4px;font-weight:600;">Hello,</p>
         <p style="font-size:15px;line-height:1.75;margin:0 0 18px;">${ec.opening.replace(/\n/g, '<br>')}</p>
         <p style="font-size:15px;line-height:1.75;color:#3a4a6a;margin:0 0 20px;">${ec.empathy.replace(/\n/g, '<br>')}</p>
         <div style="border-left:3px solid #C9A84C;border-radius:0 8px 8px 0;background:#FAF8F3;padding:14px 18px;margin-bottom:20px;">

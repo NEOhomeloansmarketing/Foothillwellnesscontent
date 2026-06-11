@@ -212,31 +212,27 @@ export default function EmailEditor({ current, onUpdate, onToast }: Props) {
                 </div>
               ) : (
                 <>
-                  <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--gold-muted)', marginBottom: 6 }}>Opening</div>
+                  <p style={{ fontSize: 15, lineHeight: 1.75, color: '#1a2540', margin: '0 0 4px', fontWeight: 600 }}>Hello,</p>
+
                   <EditableBlock value={ec.opening} fieldKey="opening" onSave={v => update('opening', v)}
                     style={{ fontSize: 15, lineHeight: 1.75, color: '#1a2540', marginBottom: 18, display: 'block' }} placeholder="Opening paragraph…" />
 
-                  <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--gold-muted)', marginBottom: 6 }}>Empathy</div>
                   <EditableBlock value={ec.empathy} fieldKey="empathy" onSave={v => update('empathy', v)}
                     style={{ fontSize: 15, lineHeight: 1.75, color: '#3a4a6a', marginBottom: 20, display: 'block' }} placeholder="Empathy paragraph…" />
 
                   <div style={{ borderLeft: '3px solid #C9A84C', borderRadius: '0 8px 8px 0', background: '#FAF8F3', padding: '14px 18px', marginBottom: 20 }}>
-                    <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--gold-muted)', marginBottom: 6 }}>Explanation</div>
                     <EditableBlock value={ec.explanation} fieldKey="explanation" onSave={v => update('explanation', v)}
                       style={{ fontSize: 14.5, lineHeight: 1.7, color: '#1a2540', display: 'block' }} placeholder="Service explanation…" />
                   </div>
 
                   <div style={{ background: '#FAF8F3', borderRadius: 10, padding: '16px 20px', marginBottom: 20, borderTop: '2px solid #C9A84C' }}>
-                    <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--gold-muted)', marginBottom: 6 }}>Proof / Review</div>
                     <EditableBlock value={ec.proof} fieldKey="proof" onSave={v => update('proof', v)}
                       style={{ fontFamily: "'Playfair Display',serif", fontStyle: 'italic', fontSize: 14.5, lineHeight: 1.65, color: '#011836', display: 'block' }} placeholder={'"Quote" — Name'} />
                   </div>
 
-                  <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--gold-muted)', marginBottom: 6 }}>Speed</div>
                   <EditableBlock value={ec.speed} fieldKey="speed" onSave={v => update('speed', v)}
                     style={{ fontSize: 15, lineHeight: 1.75, color: '#1a2540', marginBottom: 18, display: 'block' }} placeholder="Speed paragraph…" />
 
-                  <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--gold-muted)', marginBottom: 6 }}>Ease</div>
                   <EditableBlock value={ec.ease} fieldKey="ease" onSave={v => update('ease', v)}
                     style={{ fontSize: 15, lineHeight: 1.75, color: '#3a4a6a', marginBottom: 22, display: 'block' }} placeholder="Ease paragraph…" />
 
