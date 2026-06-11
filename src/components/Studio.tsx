@@ -210,6 +210,21 @@ function AIImagePanel({ service, audience, onGenerated, onClose }: {
   );
 }
 
+// ─── Canvas 2D text helper ─────────────────────────────────────────────────────
+function wrapText(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, maxW: number, lh: number, maxLines = 4): number {
+  const words = (text || '').split(' ');
+  let line = '', curY = y, count = 0;
+  for (const word of words) {
+    if (count >= maxLines) break;
+    const test = line ? line + ' ' + word : word;
+    if (ctx.measureText(test).width > maxW && line) {
+      ctx.fillText(line, x, curY); curY += lh; count++; line = word;
+    } else { line = test; }
+  }
+  if (line && count < maxLines) { ctx.fillText(line, x, curY); curY += lh; }
+  return curY;
+}
+
 // ─── Left panel: library + templates ───────────────────────────────────────────
 function LeftPanel({ projects, current, onSelect, onPick }: {
   projects: ContentPiece[]; current: ContentPiece | null;
@@ -290,9 +305,10 @@ interface CanvasProps {
   onUpdate: (p: ContentPiece) => void;
   onToast: (msg: string) => void;
   onSave: (p: ContentPiece) => void;
+  onExportImage: () => Promise<string | null>;
 }
 
-function CanvasPanel({ current, img, imgPos, onImgPos, onEditField, onUpdate, onToast, onSave }: CanvasProps) {
+function CanvasPanel({ current, img, imgPos, onImgPos, onEditField, onUpdate, onToast, onSave, onExportImage }: CanvasProps) {
   const [showCaption, setShowCaption] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [selectedOverlay, setSelectedOverlay] = useState<string | null>(null);
@@ -416,18 +432,12 @@ function CanvasPanel({ current, img, imgPos, onImgPos, onEditField, onUpdate, on
           )}
           <Btn variant="navy" icon="download" onClick={async () => {
             onToast('Generating image…');
-            const firstImg = Array.isArray(img) ? img[0] : img;
-            const res = await fetch('/api/post-graphic', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ template: current.template, content: current.graphic, imageBase64: firstImg, download: true }),
-            });
-            if (!res.ok) { onToast('Export failed — try again'); return; }
-            const blob = await res.blob();
-            const url = URL.createObjectURL(blob);
+            const dataUrl = await onExportImage();
+            if (!dataUrl) { onToast('Export failed — try again'); return; }
             const a = document.createElement('a');
-            a.href = url; a.download = 'foothill-post.png'; a.click();
-            URL.revokeObjectURL(url);
+            a.href = dataUrl;
+            a.download = 'foothill-post.png';
+            a.click();
             onToast('Downloaded!');
           }}>Export PNG</Btn>
         </div>
@@ -598,7 +608,7 @@ function CanvasPanel({ current, img, imgPos, onImgPos, onEditField, onUpdate, on
       </div>
 
       {/* Publish bar */}
-      <PublishBar current={current} img={img} onSave={onSave} onToast={onToast} />
+      <PublishBar current={current} generateImage={onExportImage} onSave={onSave} onToast={onToast} />
     </div>
   );
 }
@@ -606,9 +616,9 @@ function CanvasPanel({ current, img, imgPos, onImgPos, onEditField, onUpdate, on
 // ─── Publish bar ─────────────────────────────────────────────────────────────
 const ZAPIER_WEBHOOK = 'https://hooks.zapier.com/hooks/catch/14659614/43606p9/';
 
-function PublishBar({ current, img, onSave, onToast }: {
+function PublishBar({ current, generateImage, onSave, onToast }: {
   current: ContentPiece;
-  img: string | string[] | null;
+  generateImage: () => Promise<string | null>;
   onSave: (p: ContentPiece) => void;
   onToast: (msg: string) => void;
 }) {
@@ -616,23 +626,29 @@ function PublishBar({ current, img, onSave, onToast }: {
 
   async function handlePost() {
     setPosting(true);
-    onToast('Generating & sending…');
+    onToast('Building image…');
     try {
-      const firstImg = Array.isArray(img) ? img[0] : img;
-      const res = await fetch('/api/post-graphic', {
+      const dataUrl = await generateImage();
+      if (!dataUrl) throw new Error('Image render failed');
+
+      onToast('Uploading & sending…');
+      const res = await fetch('/api/webhook', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          template: current.template,
-          content: current.graphic,
-          imageBase64: firstImg,
-          caption: current.caption,
-          hashtags: current.hashtags,
           webhookUrl: ZAPIER_WEBHOOK,
+          payload: {
+            caption: current.caption,
+            hashtags: current.hashtags.join(' '),
+            fullCaption: current.caption + '\n\n' + current.hashtags.join(' '),
+            imageBase64: dataUrl,
+            service: current.service,
+            timestamp: new Date().toISOString(),
+          },
         }),
       });
       const data = await res.json();
-      if (!data.ok) throw new Error('Zapier did not confirm — check webhook');
+      if (!data.ok) throw new Error(data.error || `Zapier error ${data.status}`);
       onSave({ ...current, channels: ['instagram', 'google'], status: 'posted' });
       onToast('Sent to Zapier ✓');
     } catch (e) {
@@ -953,6 +969,96 @@ export default function Studio({ projects, current, generating, onSelect, onUpda
     setChans(current?.channels?.length ? current.channels as ChannelId[] : ['instagram']);
   }, [current?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  async function generatePostImage(): Promise<string | null> {
+    if (!current) return null;
+    const firstImg = Array.isArray(img) ? img[0] : img;
+    const g = current.graphic;
+    const canvas = document.createElement('canvas');
+    canvas.width = 1080; canvas.height = 1080;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+
+    await document.fonts.ready;
+
+    // Navy background
+    ctx.fillStyle = '#011836';
+    ctx.fillRect(0, 0, 1080, 1080);
+
+    // Photo (cover-fit)
+    if (firstImg) {
+      await new Promise<void>(res => {
+        const photo = new Image();
+        photo.onload = () => {
+          const ar = photo.naturalWidth / photo.naturalHeight;
+          let sx = 0, sy = 0, sw = photo.naturalWidth, sh = photo.naturalHeight;
+          if (ar > 1) { sw = sh; sx = (photo.naturalWidth - sw) / 2; }
+          else { sh = sw; sy = (photo.naturalHeight - sh) / 2; }
+          ctx.drawImage(photo, sx, sy, sw, sh, 0, 0, 1080, 1080);
+          res();
+        };
+        photo.onerror = () => res();
+        photo.src = firstImg;
+      });
+    }
+
+    // Gradient overlay
+    const grad = ctx.createLinearGradient(0, 0, 0, 1080);
+    grad.addColorStop(0, 'rgba(1,24,54,.72)');
+    grad.addColorStop(.35, 'rgba(1,24,54,.05)');
+    grad.addColorStop(.5, 'rgba(1,24,54,0)');
+    grad.addColorStop(.68, 'rgba(1,24,54,.55)');
+    grad.addColorStop(1, 'rgba(1,24,54,.98)');
+    ctx.fillStyle = grad; ctx.fillRect(0, 0, 1080, 1080);
+
+    // Logo pill (top left)
+    ctx.fillStyle = 'rgba(1,24,54,.84)';
+    ctx.beginPath(); ctx.roundRect(44, 40, 322, 58, 14); ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 20px "Playfair Display",serif';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('FOOTHILL WELLNESS', 64, 69);
+
+    // Eyebrow (top right)
+    if (g.eyebrow) {
+      ctx.fillStyle = '#D1BB74';
+      ctx.font = 'bold 16px Inter,sans-serif';
+      ctx.textAlign = 'right';
+      ctx.fillText((g.eyebrow).toUpperCase(), 1036, 69);
+      ctx.textAlign = 'left';
+    }
+    ctx.textBaseline = 'alphabetic';
+
+    // Gold divider bar
+    ctx.fillStyle = '#D1BB74';
+    ctx.beginPath(); ctx.roundRect(56, 712, 60, 3, 2); ctx.fill();
+
+    // Hook
+    const hook = g.hook || '';
+    const hSize = hook.length > 50 ? 62 : hook.length > 30 ? 76 : 90;
+    ctx.fillStyle = '#fff';
+    ctx.font = `bold ${hSize}px "Playfair Display",serif`;
+    const hookEnd = wrapText(ctx, hook, 56, 772, 970, hSize, 3);
+
+    // Subhook
+    ctx.fillStyle = 'rgba(255,255,255,.82)';
+    ctx.font = '300 26px Inter,sans-serif';
+    const subEnd = wrapText(ctx, g.subhook || '', 56, hookEnd + 16, 740, 38, 2);
+
+    // CTA pill
+    const ctaY = Math.min(subEnd + 22, 978);
+    ctx.fillStyle = '#D1BB74';
+    ctx.beginPath(); ctx.roundRect(56, ctaY, 470, 62, 31); ctx.fill();
+    ctx.fillStyle = '#011836';
+    ctx.font = 'bold 24px Inter,sans-serif';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('Call or text  (801) 784-0095', 88, ctaY + 31);
+
+    // Gold footer stripe
+    ctx.fillStyle = '#C9A84C'; ctx.fillRect(0, 1074, 1080, 6);
+
+    return canvas.toDataURL('image/png');
+  }
+
   function editField(field: string, val: string) {
     if (!current) return;
     if (field.startsWith('benefit:')) {
@@ -1004,6 +1110,7 @@ export default function Studio({ projects, current, generating, onSelect, onUpda
       <CanvasPanel
         current={current} img={img} imgPos={imgPos} onImgPos={setImgPos}
         onEditField={editField} onUpdate={onUpdate} onToast={onToast} onSave={onSave}
+        onExportImage={generatePostImage}
       />
 
       <RightPanel
