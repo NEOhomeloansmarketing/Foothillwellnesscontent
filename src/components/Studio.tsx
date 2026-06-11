@@ -574,15 +574,13 @@ function CanvasPanel({ current, img, imgPos, onImgPos, onEditField, onUpdate, on
 // ─── Publish bar ─────────────────────────────────────────────────────────────
 const PLATFORMS = [
   { id: 'instagram', label: 'Post to Instagram' },
-  { id: 'facebook', label: 'Post to Facebook' },
   { id: 'google',   label: 'Post to Google Business' },
 ] as const;
 
-type Platform = 'instagram' | 'facebook' | 'google';
+type Platform = 'instagram' | 'google';
 
 const PLATFORM_NAMES: Record<Platform, string> = {
   instagram: 'Instagram',
-  facebook: 'Facebook',
   google: 'Google Business',
 };
 
@@ -598,7 +596,6 @@ function PublishBar({ current, webhooks, onSave, onToast, getExportDataUrl }: {
   const [showSettings, setShowSettings] = useState(false);
   const [draft, setDraft] = useState<Record<Platform, string>>({
     instagram: webhooks.instagram || '',
-    facebook: webhooks.facebook || '',
     google: webhooks.google || '',
   });
 
@@ -643,7 +640,6 @@ function PublishBar({ current, webhooks, onSave, onToast, getExportDataUrl }: {
   function saveSettings() {
     setWebhooks({
       instagram: draft.instagram || undefined,
-      facebook: draft.facebook || undefined,
       google: draft.google || undefined,
     });
     setShowSettings(false);
@@ -657,7 +653,7 @@ function PublishBar({ current, webhooks, onSave, onToast, getExportDataUrl }: {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--gold-muted)' }}>Publish</div>
         <button
-          onClick={() => { setDraft({ instagram: webhooks.instagram || '', facebook: webhooks.facebook || '', google: webhooks.google || '' }); setShowSettings(v => !v); }}
+          onClick={() => { setDraft({ instagram: webhooks.instagram || '', google: webhooks.google || '' }); setShowSettings(v => !v); }}
           style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: showSettings ? 'var(--navy-mid)' : 'var(--muted)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontWeight: showSettings ? 700 : 400 }}>
           <Icon n="edit" size={12} /> {anyConfigured ? 'Edit Webhooks' : 'Setup Webhooks'}
         </button>
