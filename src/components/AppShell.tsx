@@ -59,17 +59,9 @@ export default function AppShell() {
       return fetch(url, { ...init, signal: ctrl.signal }).finally(() => clearTimeout(timer));
     }
 
-    // Start DALL-E immediately in background — don't await it here
-    let aiImageUrl: string | null = null;
-    const imagePromise = opts.userImage ? Promise.resolve() : fetchWithTimeout('/api/generate-image', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ service: opts.service, audience: opts.audience }),
-    }, 65000).then(r => r.json()).then(json => {
-      if (json.ok && json.dataUrl) aiImageUrl = json.dataUrl;
-    }).catch(() => {});
-
-    // Wait for Claude only — much faster (~5-15s)
+    // Step 1: Generate text first so we can pass the hook to DALL-E for a relevant image
+    let hook = '';
+    let subhook = '';
     try {
       const textRes = await fetchWithTimeout('/api/generate', {
         method: 'POST',
@@ -79,6 +71,8 @@ export default function AppShell() {
       const json = await textRes.json();
       if (json.ok && json.data) {
         const d = json.data;
+        hook = d.hook || '';
+        subhook = d.subhook || '';
         content = {
           ...content,
           graphic: { ...content.graphic, hook: d.hook || content.graphic.hook, emphasis: d.emphasis || content.graphic.emphasis, subhook: d.subhook || content.graphic.subhook },
@@ -88,7 +82,7 @@ export default function AppShell() {
       }
     } catch { /* use baked content */ }
 
-    // Open Studio as soon as Claude is done
+    // Open Studio immediately — image will load in background
     if (opts.userImage) {
       (content as { autoImage: string | string[] }).autoImage = opts.userImage;
     }
@@ -105,13 +99,17 @@ export default function AppShell() {
 
     addProject(proj);
     setGenerating(false);
-    // view is already 'studio'
 
-    // DALL-E image arrives in background and silently updates the canvas
+    // Step 2: kick off DALL-E in background with the actual hook so the image matches the post
     if (!opts.userImage) {
-      imagePromise.then(() => {
-        if (aiImageUrl) updateProject({ ...proj, autoImage: aiImageUrl });
-      }).catch(() => {});
+      fetchWithTimeout('/api/generate-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ service: opts.service, audience: opts.audience, hook, subhook }),
+      }, 65000)
+        .then(r => r.json())
+        .then(json => { if (json.ok && json.dataUrl) updateProject({ ...proj, autoImage: json.dataUrl }); })
+        .catch(() => {});
     }
   }
 

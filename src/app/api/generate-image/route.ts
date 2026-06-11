@@ -3,54 +3,40 @@ import OpenAI from 'openai';
 
 export const maxDuration = 60;
 
-// Service → ideal photography style for DALL-E prompt
-const SERVICE_STYLE: Record<string, string> = {
-  'Cryotherapy': 'a modern cryotherapy chamber with cool blue LED lighting, a person emerging looking refreshed and energized',
-  'Red Light Therapy': 'a person relaxing under warm red and near-infrared LED panels in a clean modern wellness clinic, glowing skin',
-  'Infrared Sauna': 'a beautiful infrared sauna interior with warm cedar wood, soft glowing light, serene and luxurious',
-  'Compression Therapy': 'a person in compression therapy boots lounging in a clean modern wellness center, relaxed and comfortable',
-  'HBOT / mHBOT': 'a hyperbaric oxygen chamber in a premium wellness clinic, modern medical spa aesthetic',
-  'IV Drip Therapy': 'a person receiving IV therapy in a luxurious wellness clinic, comfortable reclined chair, clean modern interior',
-  'IV Infusions': 'a person receiving an IV infusion in a premium wellness clinic, relaxed and comfortable, soft modern lighting',
-  'NAD+ IV': 'a vibrant energetic person in a premium wellness clinic, NAD+ IV therapy setting, modern clinical spa',
-  'NAD+ IM': 'a confident healthy person in a modern wellness clinic, bright and energetic atmosphere',
-  'Semaglutide': 'a confident woman with a healthy fit body, smiling naturally, bright wellness clinic background',
-  'Tirzepatide': 'a happy fit person standing confidently in activewear, natural light, wellness lifestyle photography',
-  'Microneedling': 'a woman with glowing clear smooth skin, close-up beauty portrait, clean white background, luxury spa',
-  'Facials': 'a woman receiving a luxury facial treatment, serene expression, modern spa, soft lighting',
-  'Botox': 'a naturally beautiful woman with smooth refreshed skin, elegant portrait, sophisticated wellness clinic',
-  'Dermal Fillers': 'a woman with naturally beautiful lifted features, elegant portrait, luxury medical spa',
-  'Emsculpt Neo': 'a toned confident person in a modern body contouring clinic, healthy athletic physique',
-};
-
-const AUDIENCE_STYLE: Record<string, string> = {
-  pain: 'a person experiencing relief from chronic pain, peaceful expression, warm wellness clinic setting',
-  healing: 'an athletic person in recovery, determined expression, modern sports medicine and wellness clinic',
-  weight: 'a confident healthy woman in activewear, natural authentic smile, bright modern setting',
-  energy: 'a radiant energetic woman, glowing skin, vibrant expression, premium wellness spa',
+const AUDIENCE_THEME: Record<string, string> = {
+  pain: 'someone experiencing chronic pain, stiffness, or physical discomfort — showing relief or the hope of healing',
+  healing: 'an athlete or active person in recovery, determined and resilient',
+  weight: 'a confident, healthy person in their element — active, energized, comfortable in their body',
+  energy: 'a radiant, energized person — glowing, focused, fully alive',
 };
 
 export async function POST(req: NextRequest) {
-  const { prompt, service, audience } = await req.json();
+  const { service, audience, hook, subhook } = await req.json();
 
   if (!process.env.OPENAI_API_KEY) {
-    return NextResponse.json({ ok: false, error: 'OPENAI_API_KEY not configured in Vercel' }, { status: 400 });
+    return NextResponse.json({ ok: false, error: 'OPENAI_API_KEY not configured' }, { status: 400 });
   }
 
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-  const serviceStyle = SERVICE_STYLE[service] || AUDIENCE_STYLE[audience] || 'a beautiful wellness spa setting with natural lighting';
-  const userAddition = prompt ? ` Additional direction: ${prompt}.` : '';
+  const audienceTheme = AUDIENCE_THEME[audience] || 'a person seeking wellness, healing, and vitality';
 
-  const fullPrompt = [
-    'Editorial lifestyle wellness photography,',
-    serviceStyle + '.',
-    userAddition,
-    'Professional photography, soft natural light, clean background, premium aesthetic, photorealistic.',
-    'Color palette: warm neutrals, creamy whites, soft greens.',
-    'Do NOT include text, logos, or watermarks.',
-    'Instagram square format, high-end wellness brand visual.',
-  ].join(' ');
+  // Build a creative brief from the actual post content
+  const contextBlock = (hook || subhook)
+    ? `The Instagram post this image accompanies says: "${hook}${subhook ? ' — ' + subhook : ''}". The image should feel like a direct visual expression of that message.`
+    : `The service is ${service}.`;
+
+  const fullPrompt = `${contextBlock}
+
+Create a compelling, emotionally resonant lifestyle photograph for a premium wellness brand Instagram post about ${service}.
+
+Subject: ${audienceTheme}.
+
+Visual direction: Let the image tell the story of transformation — before/during/after a wellness moment. Think editorial fashion photography meets medical spa. The emotion should match the copy: if the post leads with pain or struggle, show that vulnerability and the relief that follows. If it leads with energy or confidence, show that vitality.
+
+Give this image a distinct, specific mood — don't default to a generic spa aesthetic. Consider: dramatic natural light, a specific moment of emotion, an unexpected angle, a close-up detail, an outdoor wellness setting, or a candid human moment. Surprise us.
+
+Premium wellness brand. Photorealistic. No text, logos, or watermarks. Square format.`;
 
   try {
     const response = await openai.images.generate({
