@@ -290,14 +290,11 @@ interface CanvasProps {
   onUpdate: (p: ContentPiece) => void;
   onExport: () => void;
   onToast: (msg: string) => void;
-  chans: ChannelId[];
-  onChans: (c: ChannelId[]) => void;
   onSave: (p: ContentPiece) => void;
-  webhooks: Webhooks;
   getExportDataUrl: () => Promise<string | null>;
 }
 
-function CanvasPanel({ current, img, imgPos, onImgPos, onEditField, onUpdate, onExport, onToast, chans, onChans, onSave, webhooks, getExportDataUrl }: CanvasProps) {
+function CanvasPanel({ current, img, imgPos, onImgPos, onEditField, onUpdate, onExport, onToast, onSave, getExportDataUrl }: CanvasProps) {
   const [showCaption, setShowCaption] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [selectedOverlay, setSelectedOverlay] = useState<string | null>(null);
@@ -562,7 +559,6 @@ function CanvasPanel({ current, img, imgPos, onImgPos, onEditField, onUpdate, on
       {/* Publish bar */}
       <PublishBar
         current={current}
-        webhooks={webhooks}
         onSave={onSave}
         onToast={onToast}
         getExportDataUrl={getExportDataUrl}
@@ -572,46 +568,24 @@ function CanvasPanel({ current, img, imgPos, onImgPos, onEditField, onUpdate, on
 }
 
 // ─── Publish bar ─────────────────────────────────────────────────────────────
-const PLATFORMS = [
-  { id: 'instagram', label: 'Post to Instagram' },
-  { id: 'google',   label: 'Post to Google Business' },
-] as const;
+const ZAPIER_WEBHOOK = 'https://hooks.zapier.com/hooks/catch/14659614/43606p9/';
 
-type Platform = 'instagram' | 'google';
-
-const PLATFORM_NAMES: Record<Platform, string> = {
-  instagram: 'Instagram',
-  google: 'Google Business',
-};
-
-function PublishBar({ current, webhooks, onSave, onToast, getExportDataUrl }: {
+function PublishBar({ current, onSave, onToast, getExportDataUrl }: {
   current: ContentPiece;
-  webhooks: Webhooks;
   onSave: (p: ContentPiece) => void;
   onToast: (msg: string) => void;
   getExportDataUrl: () => Promise<string | null>;
 }) {
-  const setWebhooks = useStore(s => s.setWebhooks);
-  const [posting, setPosting] = useState<Platform | null>(null);
-  const [showSettings, setShowSettings] = useState(false);
-  const [draft, setDraft] = useState<Record<Platform, string>>({
-    instagram: webhooks.instagram || '',
-    google: webhooks.google || '',
-  });
+  const [posting, setPosting] = useState(false);
 
-  async function fireWebhook(platform: Platform) {
-    const url = webhooks[platform];
-    if (!url) { setShowSettings(true); onToast('Add a webhook URL first'); return; }
-
-    setPosting(platform);
+  async function handlePost() {
+    setPosting(true);
     onToast('Exporting image…');
-
     try {
       const dataUrl = await getExportDataUrl();
       if (!dataUrl) throw new Error('Could not export canvas');
 
       const payload = {
-        platform,
         service: current.service,
         caption: current.caption,
         hashtags: current.hashtags.join(' '),
@@ -623,91 +597,35 @@ function PublishBar({ current, webhooks, onSave, onToast, getExportDataUrl }: {
       const res = await fetch('/api/webhook', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ webhookUrl: url, payload }),
+        body: JSON.stringify({ webhookUrl: ZAPIER_WEBHOOK, payload }),
       });
       const data = await res.json();
       if (!data.ok) throw new Error(data.error || `Zapier returned ${data.status}`);
 
-      onSave({ ...current, channels: [platform as ChannelId], status: 'posted' });
-      onToast(`Sent to ${PLATFORM_NAMES[platform]} via Zapier ✓`);
+      onSave({ ...current, channels: ['instagram', 'google'], status: 'posted' });
+      onToast('Sent to Zapier ✓');
     } catch (e) {
-      onToast(e instanceof Error ? e.message : 'Failed — check webhook URL');
+      onToast(e instanceof Error ? e.message : 'Failed — check webhook');
     } finally {
-      setPosting(null);
+      setPosting(false);
     }
   }
 
-  function saveSettings() {
-    setWebhooks({
-      instagram: draft.instagram || undefined,
-      google: draft.google || undefined,
-    });
-    setShowSettings(false);
-    onToast('Webhook URLs saved');
-  }
-
-  const anyConfigured = PLATFORMS.some(p => !!webhooks[p.id]);
-
   return (
-    <div className="ed-publish" style={{ flexDirection: 'column', gap: 10, padding: '14px 20px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--gold-muted)' }}>Publish</div>
-        <button
-          onClick={() => { setDraft({ instagram: webhooks.instagram || '', google: webhooks.google || '' }); setShowSettings(v => !v); }}
-          style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: showSettings ? 'var(--navy-mid)' : 'var(--muted)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontWeight: showSettings ? 700 : 400 }}>
-          <Icon n="edit" size={12} /> {anyConfigured ? 'Edit Webhooks' : 'Setup Webhooks'}
-        </button>
-      </div>
-
-      {showSettings && (
-        <div style={{ background: 'var(--cream)', border: '1px solid var(--line)', borderRadius: 12, padding: '14px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <div style={{ fontSize: 11, color: 'var(--muted)', lineHeight: 1.5 }}>
-            In Zapier: create a Zap → <b>Catch Hook</b> trigger → paste the URL below for each platform.
-          </div>
-          {PLATFORMS.map(({ id, label }) => (
-            <div key={id}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--navy-mid)', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
-                <Social n={id} size={13} /> {label.replace('Post to ', '')}
-              </div>
-              <input
-                placeholder="https://hooks.zapier.com/hooks/catch/..."
-                value={draft[id]}
-                onChange={e => setDraft(d => ({ ...d, [id]: e.target.value }))}
-                style={{ width: '100%', fontSize: 12, border: '1px solid var(--line)', borderRadius: 8, padding: '7px 10px', fontFamily: 'monospace', color: 'var(--text)', outline: 'none', boxSizing: 'border-box' }}
-              />
-            </div>
-          ))}
-          <button onClick={saveSettings}
-            style={{ alignSelf: 'flex-end', fontSize: 12, fontWeight: 700, background: 'var(--navy-deep)', color: 'var(--gold-cta)', border: 'none', borderRadius: 8, padding: '8px 18px', cursor: 'pointer' }}>
-            Save
-          </button>
-        </div>
-      )}
-
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        {PLATFORMS.map(({ id, label }) => {
-          const configured = !!webhooks[id];
-          const isPosting = posting === id;
-          return (
-            <button key={id}
-              onClick={() => fireWebhook(id)}
-              disabled={posting !== null}
-              style={{
-                width: '100%', display: 'flex', alignItems: 'center', gap: 10,
-                padding: '11px 14px', borderRadius: 11, cursor: posting !== null ? 'not-allowed' : 'pointer',
-                transition: '.15s', fontWeight: 700, fontSize: 13, border: 'none',
-                background: isPosting ? 'var(--line-soft)' : configured ? 'var(--navy-deep)' : 'var(--cream)',
-                color: isPosting ? 'var(--muted)' : configured ? 'var(--gold-cta)' : 'var(--muted)',
-                outline: configured ? 'none' : '1.5px solid var(--line)',
-              }}>
-              <Social n={id} size={16} />
-              <span style={{ flex: 1, textAlign: 'left' }}>{isPosting ? 'Sending…' : label}</span>
-              {!configured && <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: '.08em', textTransform: 'uppercase' }}>Setup</span>}
-              {configured && !isPosting && <Icon n="send" size={14} />}
-            </button>
-          );
-        })}
-      </div>
+    <div className="ed-publish" style={{ padding: '14px 20px' }}>
+      <button
+        onClick={handlePost}
+        disabled={posting}
+        style={{
+          width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+          padding: '14px', borderRadius: 12, border: 'none', fontWeight: 700, fontSize: 14,
+          letterSpacing: '.04em', cursor: posting ? 'not-allowed' : 'pointer', transition: '.15s',
+          background: posting ? 'var(--line-soft)' : 'var(--navy-deep)',
+          color: posting ? 'var(--muted)' : 'var(--gold-cta)',
+        }}>
+        <Icon n={posting ? 'refresh' : 'send'} size={16} />
+        {posting ? 'Sending…' : 'Post to Social'}
+      </button>
     </div>
   );
 }
@@ -1084,8 +1002,7 @@ export default function Studio({ projects, current, generating, onSelect, onUpda
       <CanvasPanel
         current={current} img={img} imgPos={imgPos} onImgPos={setImgPos}
         onEditField={editField} onUpdate={onUpdate} onExport={exportPng} onToast={onToast}
-        chans={chans} onChans={setChans} onSave={onSave}
-        webhooks={webhooks} getExportDataUrl={getExportDataUrl}
+        onSave={onSave} getExportDataUrl={getExportDataUrl}
       />
 
       <RightPanel
