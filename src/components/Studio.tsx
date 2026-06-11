@@ -780,7 +780,7 @@ function RightPanel({ current, img, imgPos, onImgPos, onSetImg, onUpdate, onToas
   const [chat, setChat] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
-  const [rightTab, setRightTab] = useState<'image' | 'content' | 'ai'>('image');
+  const [rightTab, setRightTab] = useState<'image' | 'content' | 'ai'>('content');
   const feedRef = useRef<HTMLDivElement>(null);
   const firstImg = Array.isArray(img) ? img[0] : img;
   const isAIImg = typeof firstImg === 'string' && firstImg.startsWith('data:image');
@@ -931,6 +931,41 @@ function RightPanel({ current, img, imgPos, onImgPos, onSetImg, onUpdate, onToas
         {/* CONTENT TAB */}
         {rightTab === 'content' && (
           <div className="rp-section-group">
+
+            {/* Graphic text editing */}
+            <div className="rp-section">
+              <div className="rp-label">Graphic Text</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {([
+                  { key: 'hook',     label: 'Hook',      multi: true,  hint: 'Main headline — lead with the problem' },
+                  { key: 'emphasis', label: 'Emphasis',  multi: false, hint: 'Word to highlight in gold' },
+                  { key: 'subhook',  label: 'Subhook',   multi: true,  hint: 'Two lines: empathy ↵ solution' },
+                  { key: 'eyebrow',  label: 'Eyebrow',   multi: false, hint: 'Small tag at the top' },
+                ] as { key: keyof typeof g; label: string; multi: boolean; hint: string }[]).map(({ key, label, multi, hint }) => (
+                  <div key={key}>
+                    <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: 'var(--gold-muted)', marginBottom: 4 }}>{label}</div>
+                    {multi ? (
+                      <textarea
+                        rows={2}
+                        defaultValue={String(g[key] ?? '')}
+                        placeholder={hint}
+                        onBlur={e => { const v = e.target.value.trim(); if (v) onUpdate({ ...current, graphic: { ...g, [key]: v } }); }}
+                        style={{ width: '100%', resize: 'vertical', fontSize: 12.5, padding: '8px 10px', borderRadius: 8, border: '1.5px solid var(--line)', background: 'var(--cream)', color: 'var(--navy-mid)', fontFamily: 'inherit', lineHeight: 1.45, outline: 'none', boxSizing: 'border-box' }}
+                      />
+                    ) : (
+                      <input
+                        type="text"
+                        defaultValue={String(g[key] ?? '')}
+                        placeholder={hint}
+                        onBlur={e => { const v = e.target.value.trim(); if (v) onUpdate({ ...current, graphic: { ...g, [key]: v } }); }}
+                        style={{ width: '100%', fontSize: 12.5, padding: '8px 10px', borderRadius: 8, border: '1.5px solid var(--line)', background: 'var(--cream)', color: 'var(--navy-mid)', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }}
+                      />
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
             {/* Five Laws */}
             <div className="rp-section">
               <FiveLawsCard laws={current.fiveLaws} />
