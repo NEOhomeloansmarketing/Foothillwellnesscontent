@@ -42,17 +42,20 @@ export default function AppShell() {
     setGenerating(true);
     setCurrent(null);
 
+    const audienceShort: Record<string, string> = { pain: 'Pain', healing: 'Recovery', weight: 'Weight', energy: 'Energy' };
+
+    // bakedGenerate always succeeds — this is our guaranteed fallback content
+    const usedHooks = projects.filter(p => p.service === opts.service).map(p => p.graphic.hook);
+    const usedProof = projects.filter(p => p.audience === opts.audience).map(p => p.proofUsed).filter(Boolean);
+    let content = bakedGenerate({ ...opts, usedHooks, usedProof });
+    let aiImageUrl: string | null = null;
+
+    if (usedHooks.length) {
+      setTimeout(() => showToast(`Steering away from ${usedHooks.length} past hook${usedHooks.length > 1 ? 's' : ''} for ${opts.service}`), 1000);
+    }
+
     try {
-      const usedHooks = projects.filter(p => p.service === opts.service).map(p => p.graphic.hook);
-      const usedProof = projects.filter(p => p.audience === opts.audience).map(p => p.proofUsed).filter(Boolean);
-
-      if (usedHooks.length) {
-        setTimeout(() => showToast(`Steering away from ${usedHooks.length} past hook${usedHooks.length > 1 ? 's' : ''} for ${opts.service}`), 1000);
-      }
-
       const minWait = new Promise(r => setTimeout(r, 4800));
-      let content = bakedGenerate({ ...opts, usedHooks, usedProof });
-      let aiImageUrl: string | null = null;
 
       // Helper: fetch with a hard timeout so Promise.all never hangs
       function fetchWithTimeout(url: string, init: RequestInit, ms: number) {
@@ -87,30 +90,29 @@ export default function AppShell() {
       }).catch(() => {});
 
       await Promise.all([minWait, textPromise, imagePromise]);
-
-      if (opts.userImage) {
-        (content as { autoImage: string | string[] }).autoImage = opts.userImage;
-      } else if (aiImageUrl) {
-        (content as { autoImage: string }).autoImage = aiImageUrl;
-      }
-
-      const audienceShort: Record<string, string> = { pain: 'Pain', healing: 'Recovery', weight: 'Weight', energy: 'Energy' };
-      const proj: ContentPiece = {
-        id: 'p' + Math.random().toString(36).slice(2, 8),
-        createdAt: Date.now(),
-        channels: [],
-        status: 'draft',
-        title: `${opts.service} · ${audienceShort[opts.audience]}`,
-        ...content,
-      };
-
-      addProject(proj);
     } catch (e) {
-      // Only show error if we truly have nothing — baked content always exists
-      console.error('Generation error:', e);
-    } finally {
-      setGenerating(false);
+      console.error('Generation API error (using baked fallback):', e);
     }
+
+    // Always land in Studio with content — baked content is the guaranteed fallback
+    if (opts.userImage) {
+      (content as { autoImage: string | string[] }).autoImage = opts.userImage;
+    } else if (aiImageUrl) {
+      (content as { autoImage: string }).autoImage = aiImageUrl;
+    }
+
+    const proj: ContentPiece = {
+      id: 'p' + Math.random().toString(36).slice(2, 8),
+      createdAt: Date.now(),
+      channels: [],
+      status: 'draft',
+      title: `${opts.service} · ${audienceShort[opts.audience]}`,
+      ...content,
+    };
+
+    addProject(proj);
+    setView('studio');   // re-assert in case anything reset it during the async wait
+    setGenerating(false);
   }
 
   function openProject(p: ContentPiece) {

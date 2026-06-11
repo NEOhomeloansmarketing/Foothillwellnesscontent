@@ -977,6 +977,22 @@ export default function Studio({ projects, current, generating, onSelect, onUpda
     canvas.width = 1080; canvas.height = 1080;
     const ctx = canvas.getContext('2d');
     if (!ctx) return null;
+    const c = ctx; // capture as non-null for use inside nested functions
+
+    // roundRect polyfill for browsers without native support (pre-Chrome 99 / Safari 15.4)
+    function rr(x: number, y: number, w: number, h: number, r: number) {
+      c.beginPath();
+      c.moveTo(x + r, y);
+      c.lineTo(x + w - r, y);
+      c.arcTo(x + w, y, x + w, y + r, r);
+      c.lineTo(x + w, y + h - r);
+      c.arcTo(x + w, y + h, x + w - r, y + h, r);
+      c.lineTo(x + r, y + h);
+      c.arcTo(x, y + h, x, y + h - r, r);
+      c.lineTo(x, y + r);
+      c.arcTo(x, y, x + r, y, r);
+      c.closePath();
+    }
 
     // Wait for fonts — 2 s max so a slow CDN never blocks us
     await Promise.race([document.fonts.ready, new Promise(r => setTimeout(r, 2000))]);
@@ -1014,7 +1030,7 @@ export default function Studio({ projects, current, generating, onSelect, onUpda
 
     // Logo pill
     ctx.fillStyle = 'rgba(1,24,54,.84)';
-    ctx.beginPath(); ctx.roundRect(44, 40, 322, 58, 14); ctx.fill();
+    rr(44, 40, 322, 58, 14); ctx.fill();
     ctx.fillStyle = '#fff'; ctx.font = 'bold 20px "Playfair Display",serif';
     ctx.textBaseline = 'middle'; ctx.fillText('FOOTHILL WELLNESS', 64, 69);
 
@@ -1026,7 +1042,7 @@ export default function Studio({ projects, current, generating, onSelect, onUpda
     ctx.textBaseline = 'alphabetic';
 
     // Gold bar
-    ctx.fillStyle = '#D1BB74'; ctx.beginPath(); ctx.roundRect(56, 712, 60, 3, 2); ctx.fill();
+    ctx.fillStyle = '#D1BB74'; rr(56, 712, 60, 3, 2); ctx.fill();
 
     // Hook
     const hook = g.hook || '';
@@ -1040,7 +1056,7 @@ export default function Studio({ projects, current, generating, onSelect, onUpda
 
     // CTA pill
     const ctaY = Math.min(subEnd + 22, 978);
-    ctx.fillStyle = '#D1BB74'; ctx.beginPath(); ctx.roundRect(56, ctaY, 470, 62, 31); ctx.fill();
+    ctx.fillStyle = '#D1BB74'; rr(56, ctaY, 470, 62, 31); ctx.fill();
     ctx.fillStyle = '#011836'; ctx.font = 'bold 24px Inter,sans-serif'; ctx.textBaseline = 'middle';
     ctx.fillText('Call or text  (801) 784-0095', 88, ctaY + 31);
 
