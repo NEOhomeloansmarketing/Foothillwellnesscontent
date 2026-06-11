@@ -536,6 +536,19 @@ function CanvasPanel({ current, img, imgPos, onImgPos, onEditField, onUpdate, on
               <span style={{ fontSize: 10.5, fontWeight: 600, color: 'rgba(255,255,255,.8)' }}>⟡ Drag to reposition photo</span>
             </div>
           )}
+
+          {/* AI image loading indicator */}
+          {!img && (
+            <div style={{ position: 'absolute', bottom: 14, left: '50%', transform: 'translateX(-50%)', background: 'rgba(1,24,54,.82)', backdropFilter: 'blur(6px)', borderRadius: 10, padding: '9px 16px', pointerEvents: 'none', display: 'flex', alignItems: 'center', gap: 9, whiteSpace: 'nowrap' }}>
+              <svg width="16" height="16" viewBox="0 0 16 16" style={{ flexShrink: 0 }}>
+                <circle cx="8" cy="8" r="6" fill="none" stroke="rgba(255,255,255,.25)" strokeWidth="2.5" />
+                <circle cx="8" cy="8" r="6" fill="none" stroke="#D1BB74" strokeWidth="2.5" strokeDasharray="12 26" strokeLinecap="round">
+                  <animateTransform attributeName="transform" type="rotate" from="0 8 8" to="360 8 8" dur="0.9s" repeatCount="indefinite" />
+                </circle>
+              </svg>
+              <span style={{ fontSize: 11.5, fontWeight: 700, color: 'rgba(255,255,255,.9)', letterSpacing: '.04em' }}>AI image generating…</span>
+            </div>
+          )}
         </div>
 
         {/* Selected overlay toolbar */}
