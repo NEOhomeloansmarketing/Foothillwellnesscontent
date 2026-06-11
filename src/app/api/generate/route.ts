@@ -6,6 +6,32 @@ import type { AudienceId } from '@/types';
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
+// Assemble caption from structured parts — guarantees correct spacing regardless of AI output
+function assembleCaption(parts: {
+  problem: string;
+  empathy: string;
+  pivot: string;
+  hope: string;
+  service: string;
+  proof: string;
+  ease: string;
+  cta: string;
+}): string {
+  return [
+    parts.problem,
+    parts.empathy,
+    parts.pivot,
+    parts.hope,
+    parts.service,
+    parts.proof,
+    parts.ease,
+    parts.cta,
+  ]
+    .map(s => s?.trim())
+    .filter(Boolean)
+    .join('\n\n');
+}
+
 export async function POST(req: NextRequest) {
   const { service, audience, goal, notes, usedHooks = [], proofUsed } = await req.json();
 
@@ -14,7 +40,6 @@ export async function POST(req: NextRequest) {
 
   const audienceLabel = AUD[audience as AudienceId] ?? audience;
 
-  // Pull a short proof snippet (≤120 chars) from the testimonial for the caption
   const proofSnippet = pinned
     ? (pinned.text.length > 120 ? pinned.text.slice(0, 118).replace(/\s+\S*$/, '') + '…' : pinned.text)
     : null;
@@ -25,75 +50,39 @@ Goal: ${goal}
 ${notes ? `Notes: ${notes}` : ''}
 Don't reuse these hooks: ${usedHooks.join(' | ') || 'none'}
 
-${proofSnippet ? `Client review to use (short quote from ${pinned!.name}):\n"${proofSnippet}" — ${pinned!.name}` : ''}
+${proofSnippet ? `Client review to use:\n"${proofSnippet}" — ${pinned!.name}` : ''}
 
-Write the Instagram caption using the exact format and length shown in the EXAMPLE below. Match the voice, rhythm, and structure precisely. Then return the full JSON.`;
+Return ONLY valid minified JSON matching the schema below. No markdown. No code fences.`;
 
   const system = `You are the Instagram content voice for Foothill Wellness — a premium wellness center in Salt Lake City, UT.
 
-Brand positioning:
-- "Feel Better Faster."
-- "Your body already knows how to heal itself. We just help it heal faster."
-- The customer is the HERO. Foothill Wellness is the trusted GUIDE.
+Brand voice: warm, confident, conversational. Short punchy sentences. The customer is the HERO, Foothill is the GUIDE.
+Positioning: "Feel Better Faster." / "Your body already knows how to heal itself. We just help it heal faster."
 
-──────────────────────────────
-CAPTION FORMAT (follow this exactly — short lines, lots of white space)
-──────────────────────────────
+HOOK (graphic text) RULES — non-negotiable:
+- MUST open with the customer's problem, pain, or frustration as a short question or statement
+- NEVER start with the service name, "Foothill", "We", "Our", "At Foothill", "Introducing", "Discover"
+✅ "Feeling run down or stressed?" / "Still sore days after your workout?" / "Can't shake that brain fog?"
+❌ "Cryotherapy can help..." / "Red Light Therapy is..." / "At Foothill Wellness..."
 
-EXAMPLE OUTPUT for Red Light Therapy / chronic pain audience:
+CAPTION STRUCTURE — write each section as its own short field:
+- problem: short question or statement naming the customer's pain (NEVER start with service name)
+- empathy: 1 sentence acknowledging the frustration, making them feel seen
+- pivot: short pivot phrase on its own — "The good news?" or "Here's the truth."
+- hope: 1-2 short sentences — their body can heal, it just needs support
+- service: name the service + one specific benefit + speed signal ("one session", "within days", "30 min")
+- proof: the client review in format: "quote" — Name
+- ease: make the first step feel effortless — short, low-friction
+- cta: exactly "📞 Call or text (801) 784-0095 · Foothill Wellness, Salt Lake City"
 
-Feeling sore, stiff, or just worn down?
+Each field is a plain string — short, human, no walls of text. Use "may help", "can support". No guaranteed results.
 
-Watching everyone else move through their day while you're struggling just to keep up is exhausting.
+Return this exact JSON schema (minified, no extras):
+{"hook":"≤65 chars — customer problem first, never service name","emphasis":"1-3 word phrase from hook to highlight","subhook":"one warm sentence bridging problem to service — use 'you'","caption":{"problem":"","empathy":"","pivot":"","hope":"","service":"","proof":"","ease":"","cta":"📞 Call or text (801) 784-0095 · Foothill Wellness, Salt Lake City"},"hashtags":["8 relevant hashtags"]}`;
 
-The good news?
-
-Your body was built to recover.
-
-It just needs the right support.
-
-Red light therapy may help reduce inflammation, ease pain, and speed up your recovery — often in as little as one session.
-
-"I've had three sessions so far and my knee pain has improved dramatically." — Sarah T.
-
-One 30-minute session. No prescription. No downtime.
-
-Just show up — we handle everything.
-
-📞 Call or text (801) 784-0095 · Foothill Wellness, Salt Lake City
-
-──────────────────────────────
-RULES (non-negotiable):
-
-1. OPEN with the customer's problem or pain as a short question or statement. NEVER start with the service name, "At Foothill", "We", or "Our".
-   ✅ "Feeling run down or stressed?"
-   ✅ "Still sore days after your workout?"
-   ❌ "Cryotherapy can help you..."
-   ❌ "At Foothill Wellness, we offer..."
-
-2. EMPATHY line: acknowledge the frustration they feel. Make them feel seen.
-
-3. PIVOT: use a short turn phrase like "The good news?" or "Here's the truth." on its own line.
-
-4. HOPE: 1-2 lines — your body can heal, it just needs support.
-
-5. SERVICE line: name the service and ONE specific benefit. Use "may help", "can support". Include a speed signal ("one session", "within days", "30 minutes").
-
-6. PROOF: include the client review snippet provided. Format: "quote" — Name
-
-7. EASE line: make the first step feel effortless. "One call. No prescription. Just show up."
-
-8. CTA — final line must be exactly: 📞 Call or text (801) 784-0095 · Foothill Wellness, Salt Lake City
-
-9. Keep every line SHORT. Separate EVERY beat with a blank line. Use \\n\\n between each section in the JSON string so the spacing is preserved exactly when posted to Instagram. No walls of text.
-
-10. Return ONLY valid minified JSON. No markdown. No code fences.`;
-
-  // Service-name words that must NOT start the hook
   const forbiddenStarts = [
     service.toLowerCase().split(' ')[0],
-    'foothill', 'at foothill', 'we ', 'our ', 'introducing',
-    'discover', 'try ', 'experience', 'get ',
+    'foothill', 'at foothill', 'we ', 'our ', 'introducing', 'discover', 'try ', 'experience', 'get ',
   ];
 
   function hookStartsWithProblem(hook: string): boolean {
@@ -103,7 +92,7 @@ RULES (non-negotiable):
 
   async function generate(retryNote = '') {
     const userContent = retryNote
-      ? `${prompt}\n\nIMPORTANT: Your previous hook started with the service or business name. The hook on the graphic MUST open with the customer's problem or pain — a question or statement about how THEY feel. Rewrite it now.`
+      ? `${prompt}\n\nIMPORTANT: Your previous hook started with the service or business name. The hook MUST open with the customer's problem. Rewrite it.`
       : prompt;
     const message = await client.messages.create({
       model: 'claude-sonnet-4-6',
@@ -112,12 +101,17 @@ RULES (non-negotiable):
       messages: [{ role: 'user', content: userContent }],
     });
     const raw = (message.content[0] as { text: string }).text;
-    return JSON.parse(raw.slice(raw.indexOf('{'), raw.lastIndexOf('}') + 1));
+    const j = JSON.parse(raw.slice(raw.indexOf('{'), raw.lastIndexOf('}') + 1));
+
+    // Assemble the flat caption string from structured parts so spacing is always correct
+    if (j.caption && typeof j.caption === 'object') {
+      j.caption = assembleCaption(j.caption);
+    }
+    return j;
   }
 
   try {
     let j = await generate();
-    // If hook doesn't start with a problem, retry once with explicit correction
     if (!hookStartsWithProblem(j.hook)) {
       j = await generate('retry');
     }
