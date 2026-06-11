@@ -89,15 +89,38 @@ RULES (non-negotiable):
 
 10. Return ONLY valid minified JSON. No markdown. No code fences.`;
 
-  try {
+  // Service-name words that must NOT start the hook
+  const forbiddenStarts = [
+    service.toLowerCase().split(' ')[0],
+    'foothill', 'at foothill', 'we ', 'our ', 'introducing',
+    'discover', 'try ', 'experience', 'get ',
+  ];
+
+  function hookStartsWithProblem(hook: string): boolean {
+    const lower = hook.toLowerCase().trim();
+    return !forbiddenStarts.some(f => lower.startsWith(f));
+  }
+
+  async function generate(retryNote = '') {
+    const userContent = retryNote
+      ? `${prompt}\n\nIMPORTANT: Your previous hook started with the service or business name. The hook on the graphic MUST open with the customer's problem or pain — a question or statement about how THEY feel. Rewrite it now.`
+      : prompt;
     const message = await client.messages.create({
       model: 'claude-sonnet-4-6',
       max_tokens: 1800,
       system,
-      messages: [{ role: 'user', content: prompt }],
+      messages: [{ role: 'user', content: userContent }],
     });
     const raw = (message.content[0] as { text: string }).text;
-    const j = JSON.parse(raw.slice(raw.indexOf('{'), raw.lastIndexOf('}') + 1));
+    return JSON.parse(raw.slice(raw.indexOf('{'), raw.lastIndexOf('}') + 1));
+  }
+
+  try {
+    let j = await generate();
+    // If hook doesn't start with a problem, retry once with explicit correction
+    if (!hookStartsWithProblem(j.hook)) {
+      j = await generate('retry');
+    }
     return NextResponse.json({ ok: true, data: j });
   } catch (e) {
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
