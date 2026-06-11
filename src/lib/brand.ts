@@ -135,9 +135,7 @@ export const testimonials = [
 ];
 
 export const contentTypes = [
-  { id:'ig-post', label:'Instagram Post', group:'Social Graphics', desc:'Single square graphic + caption', ratio:'1080×1080' },
-  { id:'ig-carousel', label:'Instagram Carousel', group:'Social Graphics', desc:'3–7 swipeable slides + caption', ratio:'1080×1080' },
-  { id:'ig-story', label:'Story / Reel Cover', group:'Social Graphics', desc:'Vertical 9:16 graphic + hook', ratio:'1080×1920' },
+  { id:'ig-post', label:'Social Media Image Post', group:'Social Graphics', desc:'Square graphic + caption, ready to post', ratio:'1080×1080' },
   { id:'reel', label:'Reel / Short Script', group:'Video', desc:'Hook + shot list + caption', ratio:'9:16' },
   { id:'flyer', label:'Flyer', group:'Print', desc:'Printable promo flyer', ratio:'8.5×11' },
   { id:'handout', label:'Handout', group:'Print', desc:'In-clinic educational one-pager', ratio:'8.5×11' },
