@@ -41,11 +41,14 @@ export default function Flow({ onClose, onGenerate, contentType = 'ig-post' }: F
   const [eventDesc, setEventDesc] = useState('');
 
   const isEvent = service?.name === 'Event';
+  const isCustom = service?.name === 'Custom';
+  const [customTopic, setCustomTopic] = useState('');
+  const [customDetails, setCustomDetails] = useState('');
 
   const services = useMemo(() => flatServices(), []);
   const filtered = q ? services.filter(s => (s.name + s.cat).toLowerCase().includes(q.toLowerCase())) : services;
 
-  const canNext = [!!service, !!audience, true][step];
+  const canNext = [!!service, !!audience, isCustom ? !!customTopic : isEvent ? !!eventName : true][step];
   const last = step === 2;
 
   function next() {
@@ -62,7 +65,15 @@ export default function Flow({ onClose, onGenerate, contentType = 'ig-post' }: F
         ].filter(Boolean);
         finalNotes = parts.join(' | ');
       }
-      onGenerate({ contentType, service: service!.name, audience: audience!, goal, notes: finalNotes, userImage: photo });
+      if (isCustom) {
+        const parts = [
+          customTopic && `Topic: ${customTopic}`,
+          customDetails && `Details: ${customDetails}`,
+          notes && notes,
+        ].filter(Boolean);
+        finalNotes = parts.join(' | ');
+      }
+      onGenerate({ contentType, service: isCustom ? (customTopic || 'Custom') : service!.name, audience: audience!, goal, notes: finalNotes, userImage: photo });
     } else {
       setStep(step + 1);
     }
@@ -94,18 +105,31 @@ export default function Flow({ onClose, onGenerate, contentType = 'ig-post' }: F
             <h3 className="serif">Which service are we highlighting?</h3>
             <p className="q-sub">Pick the one treatment this piece should feature. We'll lead with the client's problem first — never the treatment menu.</p>
 
-            {/* Event shortcut */}
-            <button
-              className={`svc ${service?.name === 'Event' ? 'on' : ''}`}
-              onClick={() => setService({ cat: 'Special', name: 'Event' })}
-              style={{ width: '100%', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px' }}
-            >
-              <div style={{ fontSize: 18 }}>📅</div>
-              <div>
-                <div className="sc-cat">Special</div>
-                <div className="sc-name">Event — promote an upcoming event with details</div>
-              </div>
-            </button>
+            {/* Special shortcuts */}
+            <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+              <button
+                className={`svc ${service?.name === 'Event' ? 'on' : ''}`}
+                onClick={() => setService({ cat: 'Special', name: 'Event' })}
+                style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px' }}
+              >
+                <div style={{ fontSize: 18 }}>📅</div>
+                <div>
+                  <div className="sc-cat">Special</div>
+                  <div className="sc-name">Event</div>
+                </div>
+              </button>
+              <button
+                className={`svc ${service?.name === 'Custom' ? 'on' : ''}`}
+                onClick={() => setService({ cat: 'Special', name: 'Custom' })}
+                style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px' }}
+              >
+                <div style={{ fontSize: 18 }}>✏️</div>
+                <div>
+                  <div className="sc-cat">Special</div>
+                  <div className="sc-name">Custom</div>
+                </div>
+              </button>
+            </div>
 
             <div className="svc-search">
               <div className="hist-search" style={{ margin: 0 }}>
@@ -152,6 +176,19 @@ export default function Flow({ onClose, onGenerate, contentType = 'ig-post' }: F
                 </button>
               ))}
             </div>
+            {isCustom && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 20 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--gold-muted)' }}>Custom Topic</div>
+                <div className="field" style={{ margin: 0 }}>
+                  <label>What's this about? <span style={{ textTransform: 'none', color: 'var(--red, #e55)', fontWeight: 400 }}>*</span></label>
+                  <input placeholder="e.g. New staff member, holiday hours, a personal story…" value={customTopic} onChange={e => setCustomTopic(e.target.value)} autoFocus />
+                </div>
+                <div className="field" style={{ margin: 0 }}>
+                  <label>Details <span style={{ textTransform: 'none', color: 'var(--muted)', fontWeight: 400 }}>(the more you add, the better the output)</span></label>
+                  <textarea rows={4} placeholder="Paste in key points, talking points, offers, or anything else you want included…" value={customDetails} onChange={e => setCustomDetails(e.target.value)} />
+                </div>
+              </div>
+            )}
             {isEvent && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 20 }}>
                 <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--gold-muted)' }}>Event Details</div>
