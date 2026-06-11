@@ -58,7 +58,10 @@ export default function AppShell() {
       return fetch(url, { ...init, signal: ctrl.signal }).finally(() => clearTimeout(timer));
     }
 
-    // ── Text generation — wait for this before showing Studio ──────────────
+    // ── Both Claude text AND DALL-E image run fully in background ──────────
+    // Studio always opens after 2.5 s with baked content; AI results arrive silently.
+    let aiImageUrl: string | null = null;
+
     const textPromise = fetchWithTimeout('/api/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -75,8 +78,6 @@ export default function AppShell() {
       }
     }).catch(() => {});
 
-    // ── Image generation — started in background, does NOT block Studio ───
-    let aiImageUrl: string | null = null;
     const imagePromise = opts.userImage ? Promise.resolve() : fetchWithTimeout('/api/generate-image', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -85,9 +86,8 @@ export default function AppShell() {
       if (json.ok && json.dataUrl) aiImageUrl = json.dataUrl;
     }).catch(() => {});
 
-    // Wait for text + minimum animation time, then open Studio immediately
-    try { await Promise.all([new Promise(r => setTimeout(r, 4800)), textPromise]); }
-    catch (e) { console.error('Text generation error:', e); }
+    // Show Studio after the animation plays (2.5 s) — never waits for AI
+    await new Promise(r => setTimeout(r, 2500));
 
     if (opts.userImage) {
       (content as { autoImage: string | string[] }).autoImage = opts.userImage;
@@ -107,7 +107,11 @@ export default function AppShell() {
     setView('studio');
     setGenerating(false);
 
-    // ── Image arrives in background — update the project silently ─────────
+    // ── AI results trickle in — update the project silently ───────────────
+    textPromise.then(() => {
+      updateProject({ ...proj, graphic: content.graphic, caption: content.caption, hashtags: content.hashtags });
+    }).catch(() => {});
+
     if (!opts.userImage) {
       imagePromise.then(() => {
         if (aiImageUrl) updateProject({ ...proj, autoImage: aiImageUrl });

@@ -306,23 +306,33 @@ function CanvasPanel({ current, img, imgPos, onImgPos, onEditField, onUpdate, on
   const hasImg = !!img;
   const overlays: TextOverlay[] = current.textOverlays || [];
 
-  // Capture the live rendered canvas frame at 1080px — exact match to the preview
+  // Capture the live rendered canvas frame at 1080px — exact match to the preview.
+  // Uses html-to-image which serialises already-loaded DOM/fonts without re-fetching,
+  // avoiding the hangs that plagued html2canvas on Next.js image URLs and Google Fonts.
   async function captureFrame(): Promise<string | null> {
     const el = frameRef.current;
     if (!el) return null;
     try {
-      const { default: html2canvas } = await import('html2canvas');
-      const scale = 1080 / canvasSize;
-      const captured = await html2canvas(el, {
-        scale,
-        useCORS: true,
-        allowTaint: true,
-        logging: false,
-        backgroundColor: null,
-      });
-      return captured.toDataURL('image/png');
+      const { toPng } = await import('html-to-image');
+      const pixelRatio = 1080 / canvasSize;
+
+      // 12 s hard cap — if the serialiser hangs we surface an error instead of spinning forever
+      const dataUrl = await Promise.race([
+        toPng(el, {
+          pixelRatio,
+          cacheBust: false,      // use browser-cached resources, don't add cache-busting query strings
+          includeQueryParams: true,
+          skipFonts: false,      // fonts are already embedded by Next.js — include them
+          style: { transform: 'none' },  // neutralise any CSS transforms on the root element
+        }),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('capture timed out after 12 s')), 12000)
+        ),
+      ]);
+
+      return dataUrl;
     } catch (e) {
-      console.error('html2canvas capture failed:', e);
+      console.error('captureFrame failed:', e);
       return null;
     }
   }
