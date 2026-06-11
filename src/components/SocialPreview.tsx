@@ -12,10 +12,22 @@ interface Props {
   onClose: () => void;
 }
 
+// Normalize caption: collapse 3+ newlines to 2, trim whitespace on each line
+function formatCaption(raw: string): string {
+  return raw
+    .split('\n')
+    .map(l => l.trim())
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
 export default function SocialPreview({ imageUrl, caption, hashtags, service, webhookUrl, onPosted, onClose }: Props) {
   const [posting, setPosting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const fullCaption = caption + '\n\n' + hashtags.join(' ');
+  const cleanCaption = formatCaption(caption);
+  const hashtagLine = hashtags.join(' ');
+  const fullCaption = cleanCaption + (hashtagLine ? '\n\n' + hashtagLine : '');
 
   async function handlePost() {
     setPosting(true);
@@ -28,8 +40,8 @@ export default function SocialPreview({ imageUrl, caption, hashtags, service, we
           webhookUrl,
           payload: {
             imageUrl,
-            caption,
-            hashtags: hashtags.join(' '),
+            caption: fullCaption,
+            hashtags: hashtagLine,
             fullCaption,
             service,
             platform: 'instagram',

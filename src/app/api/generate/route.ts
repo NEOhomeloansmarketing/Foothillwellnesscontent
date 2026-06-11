@@ -85,7 +85,7 @@ RULES (non-negotiable):
 
 8. CTA — final line must be exactly: 📞 Call or text (801) 784-0095 · Foothill Wellness, Salt Lake City
 
-9. Keep every line SHORT. Use line breaks between each beat. No walls of text.
+9. Keep every line SHORT. Separate EVERY beat with a blank line. Use \\n\\n between each section in the JSON string so the spacing is preserved exactly when posted to Instagram. No walls of text.
 
 10. Return ONLY valid minified JSON. No markdown. No code fences.`;
 
