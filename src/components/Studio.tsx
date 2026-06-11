@@ -33,8 +33,7 @@ const GEN_STEPS = [
 ];
 
 // ─── Generation overlay ────────────────────────────────────────────────────────
-function GenOverlay({ step }: { step: string }) {
-  const isImagePhase = step.includes('DALL');
+function GenOverlay() {
   return (
     <div style={{
       position: 'absolute', inset: 0, zIndex: 30,
@@ -44,27 +43,26 @@ function GenOverlay({ step }: { step: string }) {
       <div style={{ textAlign: 'center' }}>
         <div style={{ width: 56, height: 56, borderRadius: '50%', border: '3px solid rgba(209,187,116,.25)', borderTopColor: '#D1BB74', margin: '0 auto 24px', animation: 'spin 1s linear infinite' }} />
         <div style={{ fontFamily: "'Playfair Display',serif", fontSize: 24, color: '#fff', fontWeight: 700, marginBottom: 8 }}>
-          {isImagePhase ? 'Almost ready…' : 'Writing your content'}
+          Writing your content…
         </div>
-        <div style={{ fontSize: 13, color: 'rgba(255,255,255,.6)', marginTop: 4 }}>{step || 'Starting up…'}</div>
+        <div style={{ fontSize: 13, color: 'rgba(255,255,255,.55)' }}>Powered by Claude AI · AI photo loads in the editor</div>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10, width: 320 }}>
         {[
-          { label: 'Writing hook, caption & Five Laws', done: isImagePhase, active: !isImagePhase },
-          { label: 'Generating your AI photo with DALL·E', done: false, active: isImagePhase },
-          { label: 'Opening your editor', done: false, active: false },
-        ].map(({ label, done, active }, k) => (
-          <div key={k} style={{ display: 'flex', alignItems: 'center', gap: 12, opacity: done || active ? 1 : 0.35, transition: '.4s' }}>
+          { label: 'Applying the Five Laws of Marketing', active: true },
+          { label: 'Building hook, caption & hashtags', active: true },
+          { label: 'AI photo generating in background…', active: false },
+        ].map(({ label, active }, k) => (
+          <div key={k} style={{ display: 'flex', alignItems: 'center', gap: 12, opacity: active ? 1 : 0.4 }}>
             <div style={{
               width: 22, height: 22, borderRadius: '50%', flex: 'none',
-              background: done ? '#43a06a' : active ? 'rgba(209,187,116,.2)' : 'rgba(255,255,255,.08)',
-              border: `1.5px solid ${done ? '#43a06a' : active ? '#D1BB74' : 'rgba(255,255,255,.15)'}`,
+              background: active ? 'rgba(209,187,116,.2)' : 'rgba(255,255,255,.08)',
+              border: `1.5px solid ${active ? '#D1BB74' : 'rgba(255,255,255,.15)'}`,
               display: 'grid', placeItems: 'center',
             }}>
-              {done && <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={2.5} strokeLinecap="round"><path d="M5 12l5 5 9-11" /></svg>}
               {active && <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#D1BB74' }} />}
             </div>
-            <span style={{ fontSize: 13, color: done || active ? '#fff' : 'rgba(255,255,255,.4)', fontWeight: active ? 600 : 400 }}>{label}</span>
+            <span style={{ fontSize: 13, color: active ? '#fff' : 'rgba(255,255,255,.4)', fontWeight: active ? 600 : 400 }}>{label}</span>
           </div>
         ))}
       </div>
@@ -1044,7 +1042,6 @@ export default function Studio({ projects, current, generating, onSelect, onUpda
   const [chans, setChans] = useState<ChannelId[]>(['instagram']);
   const fileRef = useRef<HTMLInputElement | null>(null);
   const webhooks = useStore(s => s.webhooks);
-  const genStep = useStore(s => s.genStep);
 
   useEffect(() => {
     // When the project switches, always reset position
@@ -1079,7 +1076,7 @@ export default function Studio({ projects, current, generating, onSelect, onUpda
   if (generating) {
     return (
       <div className="ed-layout">
-        <div style={{ gridColumn: '1/-1', position: 'relative' }}><GenOverlay step={genStep} /></div>
+        <div style={{ gridColumn: '1/-1', position: 'relative' }}><GenOverlay /></div>
       </div>
     );
   }

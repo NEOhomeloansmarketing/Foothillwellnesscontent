@@ -15,7 +15,7 @@ import type { ContentPiece, GenerateOptions } from '@/types';
 export default function AppShell() {
   const {
     projects, current, view, flowOpen, generating, toast,
-    setCurrent, setView, setFlowOpen, setGenerating, setGenStep, setToast,
+    setCurrent, setView, setFlowOpen, setGenerating, setToast,
     updateCurrent, updateProject, addProject,
   } = useStore();
 
@@ -39,8 +39,9 @@ export default function AppShell() {
 
   async function runGenerate(opts: GenerateOptions & { userImage?: string | null }) {
     setFlowOpen(false);
+    setView('studio');           // switch immediately so overlay is visible
     setGenerating(true);
-    setGenStep('Writing your content with Claude AI...');
+
     setCurrent(null);
 
     const audienceShort: Record<string, string> = { pain: 'Pain', healing: 'Recovery', weight: 'Weight', energy: 'Energy' };
@@ -58,9 +59,17 @@ export default function AppShell() {
       return fetch(url, { ...init, signal: ctrl.signal }).finally(() => clearTimeout(timer));
     }
 
+    // Start DALL-E immediately in background — don't await it here
     let aiImageUrl: string | null = null;
+    const imagePromise = opts.userImage ? Promise.resolve() : fetchWithTimeout('/api/generate-image', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ service: opts.service, audience: opts.audience }),
+    }, 65000).then(r => r.json()).then(json => {
+      if (json.ok && json.dataUrl) aiImageUrl = json.dataUrl;
+    }).catch(() => {});
 
-    // Phase 1: Claude text
+    // Wait for Claude only — much faster (~5-15s)
     try {
       const textRes = await fetchWithTimeout('/api/generate', {
         method: 'POST',
@@ -79,20 +88,7 @@ export default function AppShell() {
       }
     } catch { /* use baked content */ }
 
-    // Phase 2: DALL-E image (skip if user uploaded their own)
-    if (!opts.userImage) {
-      setGenStep('Generating your AI photo with DALL·E...');
-      try {
-        const imgRes = await fetchWithTimeout('/api/generate-image', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ service: opts.service, audience: opts.audience }),
-        }, 65000);
-        const imgJson = await imgRes.json();
-        if (imgJson.ok && imgJson.dataUrl) aiImageUrl = imgJson.dataUrl;
-      } catch { /* no image */ }
-    }
-
+    // Open Studio as soon as Claude is done
     if (opts.userImage) {
       (content as { autoImage: string | string[] }).autoImage = opts.userImage;
     }
@@ -105,13 +101,18 @@ export default function AppShell() {
       status: 'draft',
       title: `${opts.service} · ${audienceShort[opts.audience]}`,
       ...content,
-      autoImage: aiImageUrl ?? (opts.userImage || content.autoImage),
     };
 
     addProject(proj);
-    setGenStep('');
     setGenerating(false);
-    setView('studio');
+    // view is already 'studio'
+
+    // DALL-E image arrives in background and silently updates the canvas
+    if (!opts.userImage) {
+      imagePromise.then(() => {
+        if (aiImageUrl) updateProject({ ...proj, autoImage: aiImageUrl });
+      }).catch(() => {});
+    }
   }
 
   function openProject(p: ContentPiece) {
