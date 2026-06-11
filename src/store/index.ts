@@ -18,6 +18,7 @@ interface AppStore {
   genStep: string;
   toast: string | null;
   webhooks: Webhooks;
+  postSuccess: boolean;
 
   setProjects: (projects: ContentPiece[]) => void;
   setCurrent: (p: ContentPiece | null) => void;
@@ -31,6 +32,7 @@ interface AppStore {
   addProject: (p: ContentPiece) => void;
   removeProject: (id: string) => void;
   setWebhooks: (w: Webhooks) => void;
+  setPostSuccess: (v: boolean) => void;
 }
 
 export const useStore = create<AppStore>()(
@@ -43,6 +45,7 @@ export const useStore = create<AppStore>()(
       generating: false,
       genStep: '',
       toast: null,
+      postSuccess: false,
       webhooks: {
         instagram: 'https://hooks.zapier.com/hooks/catch/14659614/43606p9/',
         google: 'https://hooks.zapier.com/hooks/catch/14659614/43606p9/',
@@ -72,6 +75,7 @@ export const useStore = create<AppStore>()(
         current: state.current?.id === id ? (state.projects.find(x => x.id !== id) ?? null) : state.current,
       })),
       setWebhooks: (w) => set(state => ({ webhooks: { ...state.webhooks, ...w } })),
+      setPostSuccess: (v) => set({ postSuccess: v }),
     }),
     {
       name: 'fw_projects',

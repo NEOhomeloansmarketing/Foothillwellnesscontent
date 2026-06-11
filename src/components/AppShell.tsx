@@ -1,5 +1,5 @@
 'use client';
-import { useRef, useState } from 'react';
+import { useRef } from 'react';
 import Image from 'next/image';
 import Icon from './ui/Icon';
 import Btn from './ui/Btn';
@@ -14,13 +14,12 @@ import type { ContentPiece, GenerateOptions } from '@/types';
 
 export default function AppShell() {
   const {
-    projects, current, view, flowOpen, generating, toast,
-    setCurrent, setView, setFlowOpen, setGenerating, setToast,
+    projects, current, view, flowOpen, generating, toast, postSuccess,
+    setCurrent, setView, setFlowOpen, setGenerating, setToast, setPostSuccess,
     updateCurrent, updateProject, addProject,
   } = useStore();
 
   const toastT = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const [postSuccess, setPostSuccess] = useState(false);
 
   function showToast(msg: string) {
     setToast(msg);

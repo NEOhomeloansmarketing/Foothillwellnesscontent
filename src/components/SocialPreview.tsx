@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import Icon from './ui/Icon';
+import { useStore } from '@/store';
 
 interface Props {
   imageUrl: string;
@@ -22,6 +23,7 @@ function formatCaption(raw: string): string {
 }
 
 export default function SocialPreview({ imageUrl, caption, hashtags, service, webhookUrl, onPosted, onClose }: Props) {
+  const setPostSuccess = useStore(s => s.setPostSuccess);
   const [posting, setPosting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const cleanCaption = formatCaption(caption);
@@ -47,7 +49,8 @@ export default function SocialPreview({ imageUrl, caption, hashtags, service, we
         },
       }),
     }).catch(() => {});
-    // Success immediately — Zapier delivery is best-effort
+    // Trigger success overlay via store — bypasses the entire prop chain
+    setPostSuccess(true);
     onPosted();
   }
 
