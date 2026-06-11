@@ -27,32 +27,34 @@ function Rule({ style }: { style?: React.CSSProperties }) {
   );
 }
 
-// Mountain SVG logo mark
-function Mountains({ color = GOLD, size = 48 }: { color?: string; size?: number }) {
-  return (
-    <svg width={size} height={size * 0.6} viewBox="0 0 120 72" fill="none">
-      <polygon points="60,4 100,68 20,68" fill="none" stroke={color} strokeWidth="4" strokeLinejoin="round" />
-      <polygon points="85,20 112,68 58,68" fill="none" stroke={color} strokeWidth="3.5" strokeLinejoin="round" />
-      <polygon points="35,28 62,68 8,68" fill="none" stroke={color} strokeWidth="3" strokeLinejoin="round" />
-      <line x1="52" y1="4" x2="60" y2="4" stroke={color} strokeWidth="2" />
-      <line x1="60" y1="4" x2="68" y2="4" stroke={color} strokeWidth="2" />
-    </svg>
-  );
-}
-
+// Logo using the actual brand asset
+// The PNG has a navy background — on dark panels use it as-is,
+// on light (cream) panels wrap in a navy rounded pill so it reads correctly.
 function LogoBlock({ dark = false, size = 'md' }: { dark?: boolean; size?: 'sm' | 'md' | 'lg' }) {
-  const color = dark ? GOLD : NAVY;
-  const sub   = dark ? 'rgba(201,168,76,.6)' : 'rgba(1,24,54,.45)';
-  const sizes = { sm: { title: 14, sub: 7, mtn: 28 }, md: { title: 18, sub: 8, mtn: 36 }, lg: { title: 26, sub: 10, mtn: 52 } }[size];
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-      <Mountains color={color} size={sizes.mtn} />
-      <div style={{ fontFamily: "'Playfair Display',Georgia,serif", fontSize: sizes.title, fontWeight: 900, color, letterSpacing: '.12em', textTransform: 'uppercase', lineHeight: 1 }}>
-        Foothill<br /><span style={{ fontSize: sizes.title * 0.7, letterSpacing: '.28em' }}>— Wellness —</span>
-      </div>
-      <div style={{ fontSize: sizes.sub, letterSpacing: '.18em', textTransform: 'uppercase', color: sub, marginTop: 2 }}>Feel Better Faster.</div>
-    </div>
+  const widths = { sm: 120, md: 150, lg: 200 };
+  const w = widths[size];
+  const h = Math.round(w * 0.44); // logo aspect ratio ≈ 2.27:1
+
+  const img = (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src="/foothill-logo.png"
+      alt="Foothill Wellness"
+      width={w}
+      height={h}
+      style={{ display: 'block', objectFit: 'contain', width: w, height: h }}
+    />
   );
+
+  // On light backgrounds add a navy pill so the logo is readable
+  if (!dark) {
+    return (
+      <div style={{ background: NAVY, borderRadius: 8, padding: '6px 10px', display: 'inline-flex' }}>
+        {img}
+      </div>
+    );
+  }
+  return img;
 }
 
 function BenefitRow({ b }: { b: FlyerBenefit }) {
