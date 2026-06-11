@@ -751,7 +751,7 @@ function PublishBar({ current, captureFrame, onSave, onToast, webhookUrl, onWebh
           caption={current.caption}
           hashtags={current.hashtags}
           service={current.service}
-          webhookUrl={webhookUrl!}
+          webhookUrl={webhookUrl || 'https://hooks.zapier.com/hooks/catch/14659614/43606p9/'}
           onClose={() => { setStage('idle'); setImageUrl(null); }}
           onPosted={() => {
             setStage('idle');

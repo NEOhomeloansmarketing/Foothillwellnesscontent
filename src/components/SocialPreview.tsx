@@ -128,6 +128,20 @@ export default function SocialPreview({ imageUrl, caption, hashtags, service, we
           <button onClick={onClose} style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: 24, color: 'var(--muted)', lineHeight: 1, padding: 4 }}>×</button>
         </div>
 
+        {/* Error banner */}
+        {error && (
+          <div style={{ background: '#fef2f2', borderBottom: '2px solid #fca5a5', padding: '14px 28px', display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+            <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#fee2e2', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 }}>
+              <span style={{ color: '#dc2626', fontSize: 16, fontWeight: 900, lineHeight: 1 }}>!</span>
+            </div>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#dc2626', marginBottom: 2 }}>Post failed — Zapier didn't receive it</div>
+              <div style={{ fontSize: 12, color: '#b91c1c', lineHeight: 1.5 }}>{error}</div>
+              <div style={{ fontSize: 11.5, color: '#b91c1c', marginTop: 4, opacity: 0.8 }}>Check the webhook URL under "Socials connected" and try again.</div>
+            </div>
+          </div>
+        )}
+
         {/* Body */}
         <div style={{ flex: 1, overflowY: 'auto', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0 }}>
           {/* Image */}
@@ -154,11 +168,6 @@ export default function SocialPreview({ imageUrl, caption, hashtags, service, we
               </div>
             </div>
 
-            {error && (
-              <div style={{ background: '#fef2f2', border: '1.5px solid #fca5a5', borderRadius: 10, padding: '12px 14px', fontSize: 12.5, color: '#dc2626', lineHeight: 1.5 }}>
-                <strong>Error:</strong> {error}
-              </div>
-            )}
           </div>
         </div>
 
