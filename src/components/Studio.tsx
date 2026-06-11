@@ -6,7 +6,8 @@ import Btn from './ui/Btn';
 import GraphicCanvas, { TEMPLATES } from './graphic/GraphicCanvas';
 import { AUD } from '@/lib/content';
 import { useStore } from '@/store';
-import type { ContentPiece, ChannelId, ChatMessage, FiveLaw, TextOverlay, SocialAccount } from '@/types';
+import type { ContentPiece, ChannelId, ChatMessage, FiveLaw, TextOverlay } from '@/types';
+import type { Webhooks } from '@/store';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function fmtDate(ts: number) {
@@ -292,11 +293,11 @@ interface CanvasProps {
   chans: ChannelId[];
   onChans: (c: ChannelId[]) => void;
   onSave: (p: ContentPiece) => void;
-  accounts: SocialAccount[];
+  webhooks: Webhooks;
   getExportDataUrl: () => Promise<string | null>;
 }
 
-function CanvasPanel({ current, img, imgPos, onImgPos, onEditField, onUpdate, onExport, onToast, chans, onChans, onSave, accounts, getExportDataUrl }: CanvasProps) {
+function CanvasPanel({ current, img, imgPos, onImgPos, onEditField, onUpdate, onExport, onToast, chans, onChans, onSave, webhooks, getExportDataUrl }: CanvasProps) {
   const [showCaption, setShowCaption] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [selectedOverlay, setSelectedOverlay] = useState<string | null>(null);
@@ -561,9 +562,7 @@ function CanvasPanel({ current, img, imgPos, onImgPos, onEditField, onUpdate, on
       {/* Publish bar */}
       <PublishBar
         current={current}
-        chans={chans}
-        onChans={onChans}
-        accounts={accounts}
+        webhooks={webhooks}
         onSave={onSave}
         onToast={onToast}
         getExportDataUrl={getExportDataUrl}
@@ -573,136 +572,146 @@ function CanvasPanel({ current, img, imgPos, onImgPos, onEditField, onUpdate, on
 }
 
 // ─── Publish bar ─────────────────────────────────────────────────────────────
-function PublishBar({ current, chans, onChans, accounts, onSave, onToast, getExportDataUrl }: {
+const PLATFORMS = [
+  { id: 'instagram', label: 'Post to Instagram' },
+  { id: 'facebook', label: 'Post to Facebook' },
+  { id: 'google',   label: 'Post to Google Business' },
+] as const;
+
+type Platform = 'instagram' | 'facebook' | 'google';
+
+const PLATFORM_NAMES: Record<Platform, string> = {
+  instagram: 'Instagram',
+  facebook: 'Facebook',
+  google: 'Google Business',
+};
+
+function PublishBar({ current, webhooks, onSave, onToast, getExportDataUrl }: {
   current: ContentPiece;
-  chans: ChannelId[];
-  onChans: (c: ChannelId[]) => void;
-  accounts: SocialAccount[];
+  webhooks: Webhooks;
   onSave: (p: ContentPiece) => void;
   onToast: (msg: string) => void;
   getExportDataUrl: () => Promise<string | null>;
 }) {
-  const [posting, setPosting] = useState(false);
+  const setWebhooks = useStore(s => s.setWebhooks);
+  const [posting, setPosting] = useState<Platform | null>(null);
+  const [showSettings, setShowSettings] = useState(false);
+  const [draft, setDraft] = useState<Record<Platform, string>>({
+    instagram: webhooks.instagram || '',
+    facebook: webhooks.facebook || '',
+    google: webhooks.google || '',
+  });
 
-  const igAccount = accounts.find(a => a.platform === 'instagram');
-  const gAccount = accounts.find(a => a.platform === 'google');
+  async function fireWebhook(platform: Platform) {
+    const url = webhooks[platform];
+    if (!url) { setShowSettings(true); onToast('Add a webhook URL first'); return; }
 
-  async function handlePost() {
-    const selected = chans.filter(c => c === 'instagram' ? !!igAccount : !!gAccount);
-    if (!selected.length) { onToast('Connect an account first'); return; }
-
-    setPosting(true);
-    onToast('Preparing image…');
+    setPosting(platform);
+    onToast('Exporting image…');
 
     try {
-      // Export canvas as data URL
       const dataUrl = await getExportDataUrl();
       if (!dataUrl) throw new Error('Could not export canvas');
 
-      // Upload to Vercel Blob for public URL
-      const uploadRes = await fetch('/api/upload', {
+      const payload = {
+        platform,
+        service: current.service,
+        caption: current.caption,
+        hashtags: current.hashtags.join(' '),
+        fullCaption: current.caption + '\n\n' + current.hashtags.join(' '),
+        imageBase64: dataUrl,
+        timestamp: new Date().toISOString(),
+      };
+
+      const res = await fetch('/api/webhook', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dataUrl }),
+        body: JSON.stringify({ webhookUrl: url, payload }),
       });
-      const uploadData = await uploadRes.json();
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || `Zapier returned ${data.status}`);
 
-      const imageUrl: string | null = uploadData.ok ? uploadData.url : null;
-      const caption = current.caption + '\n\n' + current.hashtags.join(' ');
-      const results: string[] = [];
-      const errors: string[] = [];
-
-      if (selected.includes('instagram') && igAccount) {
-        if (!imageUrl) { errors.push('Instagram: image upload failed'); }
-        else {
-          const res = await fetch('/api/post/instagram', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ imageUrl, caption, igUserId: igAccount.accountId, accessToken: igAccount.accessToken }),
-          });
-          const data = await res.json();
-          if (data.ok) results.push('Instagram ✓');
-          else errors.push('Instagram: ' + data.error);
-        }
-      }
-
-      if (selected.includes('google') && gAccount) {
-        const res = await fetch('/api/post/google', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ imageUrl, caption: current.caption, locationName: gAccount.locationId || gAccount.accountId, accessToken: gAccount.accessToken, refreshToken: gAccount.refreshToken }),
-        });
-        const data = await res.json();
-        if (data.ok) results.push('Google Business ✓');
-        else errors.push('Google: ' + data.error);
-      }
-
-      if (results.length) {
-        onSave({ ...current, channels: chans, status: 'posted' });
-        onToast('Posted to ' + results.join(', '));
-      }
-      if (errors.length) onToast(errors[0]);
+      onSave({ ...current, channels: [platform as ChannelId], status: 'posted' });
+      onToast(`Sent to ${PLATFORM_NAMES[platform]} via Zapier ✓`);
     } catch (e) {
-      onToast(e instanceof Error ? e.message : 'Post failed');
+      onToast(e instanceof Error ? e.message : 'Failed — check webhook URL');
     } finally {
-      setPosting(false);
+      setPosting(null);
     }
   }
 
+  function saveSettings() {
+    setWebhooks({
+      instagram: draft.instagram || undefined,
+      facebook: draft.facebook || undefined,
+      google: draft.google || undefined,
+    });
+    setShowSettings(false);
+    onToast('Webhook URLs saved');
+  }
+
+  const anyConfigured = PLATFORMS.some(p => !!webhooks[p.id]);
+
   return (
     <div className="ed-publish" style={{ flexDirection: 'column', gap: 10, padding: '14px 20px' }}>
-      <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--gold-muted)' }}>Publish To</div>
-      <div style={{ display: 'flex', gap: 8 }}>
-        {/* Instagram */}
-        <div style={{ flex: 1, border: `1.5px solid ${igAccount ? '#d6ebdd' : 'var(--line)'}`, borderRadius: 12, padding: '10px 12px', background: igAccount ? '#eef6f0' : '#fff', display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{ flexShrink: 0, color: igAccount ? '#2d6a4a' : 'var(--muted)' }}>
-            <Social n="instagram" size={20} />
-          </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: igAccount ? '#2d6a4a' : 'var(--navy-mid)' }}>Instagram</div>
-            {igAccount
-              ? <div style={{ fontSize: 11, color: '#43a06a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{igAccount.name}</div>
-              : <div style={{ fontSize: 11, color: 'var(--muted)' }}>Not connected</div>}
-          </div>
-          {igAccount ? (
-            <button onClick={() => onChans(chans.includes('instagram') ? chans.filter(x => x !== 'instagram') : [...chans, 'instagram'])}
-              style={{ width: 22, height: 22, borderRadius: '50%', border: `2px solid ${chans.includes('instagram') ? '#43a06a' : 'var(--line)'}`, background: chans.includes('instagram') ? '#43a06a' : '#fff', flexShrink: 0, cursor: 'pointer', display: 'grid', placeItems: 'center', color: '#fff' }}>
-              {chans.includes('instagram') && <Icon n="check" size={12} sw={2.5} />}
-            </button>
-          ) : (
-            <a href="/api/auth/instagram" style={{ fontSize: 11, fontWeight: 700, color: 'var(--navy-mid)', background: 'var(--cream)', border: '1px solid var(--line)', borderRadius: 7, padding: '4px 9px', textDecoration: 'none', flexShrink: 0 }}>Connect</a>
-          )}
-        </div>
-
-        {/* Google Business */}
-        <div style={{ flex: 1, border: `1.5px solid ${gAccount ? '#d6ebdd' : 'var(--line)'}`, borderRadius: 12, padding: '10px 12px', background: gAccount ? '#eef6f0' : '#fff', display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{ flexShrink: 0, color: gAccount ? '#2d6a4a' : 'var(--muted)' }}>
-            <Social n="google" size={20} />
-          </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: gAccount ? '#2d6a4a' : 'var(--navy-mid)' }}>Google Business</div>
-            {gAccount
-              ? <div style={{ fontSize: 11, color: '#43a06a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{gAccount.name}</div>
-              : <div style={{ fontSize: 11, color: 'var(--muted)' }}>Not connected</div>}
-          </div>
-          {gAccount ? (
-            <button onClick={() => onChans(chans.includes('google') ? chans.filter(x => x !== 'google') : [...chans, 'google'])}
-              style={{ width: 22, height: 22, borderRadius: '50%', border: `2px solid ${chans.includes('google') ? '#43a06a' : 'var(--line)'}`, background: chans.includes('google') ? '#43a06a' : '#fff', flexShrink: 0, cursor: 'pointer', display: 'grid', placeItems: 'center', color: '#fff' }}>
-              {chans.includes('google') && <Icon n="check" size={12} sw={2.5} />}
-            </button>
-          ) : (
-            <a href="/api/auth/google" style={{ fontSize: 11, fontWeight: 700, color: 'var(--navy-mid)', background: 'var(--cream)', border: '1px solid var(--line)', borderRadius: 7, padding: '4px 9px', textDecoration: 'none', flexShrink: 0 }}>Connect</a>
-          )}
-        </div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--gold-muted)' }}>Publish</div>
+        <button
+          onClick={() => { setDraft({ instagram: webhooks.instagram || '', facebook: webhooks.facebook || '', google: webhooks.google || '' }); setShowSettings(v => !v); }}
+          style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: showSettings ? 'var(--navy-mid)' : 'var(--muted)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontWeight: showSettings ? 700 : 400 }}>
+          <Icon n="edit" size={12} /> {anyConfigured ? 'Edit Webhooks' : 'Setup Webhooks'}
+        </button>
       </div>
 
-      <button
-        onClick={handlePost}
-        disabled={posting || (!igAccount && !gAccount)}
-        style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9, padding: '13px', borderRadius: 12, background: (posting || (!igAccount && !gAccount)) ? 'var(--line-soft)' : 'var(--navy-deep)', color: (posting || (!igAccount && !gAccount)) ? 'var(--muted)' : 'var(--gold-cta)', fontSize: 14, fontWeight: 700, border: 'none', cursor: (posting || (!igAccount && !gAccount)) ? 'not-allowed' : 'pointer', transition: '.15s', letterSpacing: '.04em' }}>
-        <Icon n={posting ? 'refresh' : 'send'} size={16} />
-        {posting ? 'Posting…' : 'Post Now'}
-      </button>
+      {showSettings && (
+        <div style={{ background: 'var(--cream)', border: '1px solid var(--line)', borderRadius: 12, padding: '14px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div style={{ fontSize: 11, color: 'var(--muted)', lineHeight: 1.5 }}>
+            In Zapier: create a Zap → <b>Catch Hook</b> trigger → paste the URL below for each platform.
+          </div>
+          {PLATFORMS.map(({ id, label }) => (
+            <div key={id}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--navy-mid)', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Social n={id} size={13} /> {label.replace('Post to ', '')}
+              </div>
+              <input
+                placeholder="https://hooks.zapier.com/hooks/catch/..."
+                value={draft[id]}
+                onChange={e => setDraft(d => ({ ...d, [id]: e.target.value }))}
+                style={{ width: '100%', fontSize: 12, border: '1px solid var(--line)', borderRadius: 8, padding: '7px 10px', fontFamily: 'monospace', color: 'var(--text)', outline: 'none', boxSizing: 'border-box' }}
+              />
+            </div>
+          ))}
+          <button onClick={saveSettings}
+            style={{ alignSelf: 'flex-end', fontSize: 12, fontWeight: 700, background: 'var(--navy-deep)', color: 'var(--gold-cta)', border: 'none', borderRadius: 8, padding: '8px 18px', cursor: 'pointer' }}>
+            Save
+          </button>
+        </div>
+      )}
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {PLATFORMS.map(({ id, label }) => {
+          const configured = !!webhooks[id];
+          const isPosting = posting === id;
+          return (
+            <button key={id}
+              onClick={() => fireWebhook(id)}
+              disabled={posting !== null}
+              style={{
+                width: '100%', display: 'flex', alignItems: 'center', gap: 10,
+                padding: '11px 14px', borderRadius: 11, cursor: posting !== null ? 'not-allowed' : 'pointer',
+                transition: '.15s', fontWeight: 700, fontSize: 13, border: 'none',
+                background: isPosting ? 'var(--line-soft)' : configured ? 'var(--navy-deep)' : 'var(--cream)',
+                color: isPosting ? 'var(--muted)' : configured ? 'var(--gold-cta)' : 'var(--muted)',
+                outline: configured ? 'none' : '1.5px solid var(--line)',
+              }}>
+              <Social n={id} size={16} />
+              <span style={{ flex: 1, textAlign: 'left' }}>{isPosting ? 'Sending…' : label}</span>
+              {!configured && <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: '.08em', textTransform: 'uppercase' }}>Setup</span>}
+              {configured && !isPosting && <Icon n="send" size={14} />}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -991,7 +1000,7 @@ export default function Studio({ projects, current, generating, onSelect, onUpda
   const [imgPos, setImgPos] = useState({ x: 50, y: 35 });
   const [chans, setChans] = useState<ChannelId[]>(['instagram']);
   const fileRef = useRef<HTMLInputElement | null>(null);
-  const accounts = useStore(s => s.accounts);
+  const webhooks = useStore(s => s.webhooks);
 
   useEffect(() => {
     setImg(current?.autoImage ?? null);
@@ -1080,7 +1089,7 @@ export default function Studio({ projects, current, generating, onSelect, onUpda
         current={current} img={img} imgPos={imgPos} onImgPos={setImgPos}
         onEditField={editField} onUpdate={onUpdate} onExport={exportPng} onToast={onToast}
         chans={chans} onChans={setChans} onSave={onSave}
-        accounts={accounts} getExportDataUrl={getExportDataUrl}
+        webhooks={webhooks} getExportDataUrl={getExportDataUrl}
       />
 
       <RightPanel

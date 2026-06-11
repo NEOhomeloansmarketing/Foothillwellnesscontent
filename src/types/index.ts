@@ -1,7 +1,7 @@
 export type AudienceId = 'pain' | 'healing' | 'weight' | 'energy';
 export type TemplateId = 'educate' | 'statement' | 'proof' | 'photo' | 'editorial';
 export type StatusType = 'draft' | 'scheduled' | 'posted';
-export type ChannelId = 'instagram' | 'google';
+export type ChannelId = 'instagram' | 'facebook' | 'google';
 
 export interface SocialAccount {
   platform: 'instagram' | 'google';

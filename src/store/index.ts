@@ -1,8 +1,14 @@
 'use client';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { ContentPiece, SocialAccount } from '@/types';
+import type { ContentPiece } from '@/types';
 import { seedProjects } from '@/lib/content';
+
+export interface Webhooks {
+  instagram?: string;
+  facebook?: string;
+  google?: string;
+}
 
 interface AppStore {
   projects: ContentPiece[];
@@ -11,7 +17,7 @@ interface AppStore {
   flowOpen: boolean;
   generating: boolean;
   toast: string | null;
-  accounts: SocialAccount[];
+  webhooks: Webhooks;
 
   setProjects: (projects: ContentPiece[]) => void;
   setCurrent: (p: ContentPiece | null) => void;
@@ -22,8 +28,7 @@ interface AppStore {
   updateCurrent: (p: ContentPiece) => void;
   addProject: (p: ContentPiece) => void;
   removeProject: (id: string) => void;
-  setAccount: (account: SocialAccount) => void;
-  removeAccount: (platform: 'instagram' | 'google') => void;
+  setWebhooks: (w: Webhooks) => void;
 }
 
 export const useStore = create<AppStore>()(
@@ -35,7 +40,7 @@ export const useStore = create<AppStore>()(
       flowOpen: false,
       generating: false,
       toast: null,
-      accounts: [],
+      webhooks: {},
 
       setProjects: (projects) => set({ projects }),
       setCurrent: (p) => set({ current: p }),
@@ -55,16 +60,11 @@ export const useStore = create<AppStore>()(
         projects: state.projects.filter(x => x.id !== id),
         current: state.current?.id === id ? (state.projects.find(x => x.id !== id) ?? null) : state.current,
       })),
-      setAccount: (account) => set(state => ({
-        accounts: [...state.accounts.filter(a => a.platform !== account.platform), account],
-      })),
-      removeAccount: (platform) => set(state => ({
-        accounts: state.accounts.filter(a => a.platform !== platform),
-      })),
+      setWebhooks: (w) => set(state => ({ webhooks: { ...state.webhooks, ...w } })),
     }),
     {
       name: 'fw_projects',
-      partialize: (state) => ({ projects: state.projects, accounts: state.accounts }),
+      partialize: (state) => ({ projects: state.projects, webhooks: state.webhooks }),
     }
   )
 );
