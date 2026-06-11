@@ -1,7 +1,6 @@
 'use client';
 import { useState } from 'react';
 import Icon from './ui/Icon';
-import { useStore } from '@/store';
 
 interface Props {
   imageUrl: string;
@@ -23,9 +22,7 @@ function formatCaption(raw: string): string {
 }
 
 export default function SocialPreview({ imageUrl, caption, hashtags, service, webhookUrl, onPosted, onClose }: Props) {
-  const setView = useStore(s => s.setView);
   const [posting, setPosting] = useState(false);
-  const [posted, setPosted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const cleanCaption = formatCaption(caption);
   const hashtagLine = hashtags.join(' ');
@@ -54,50 +51,14 @@ export default function SocialPreview({ imageUrl, caption, hashtags, service, we
       const data = await res.json();
       if (!data.ok) throw new Error(data.error || `Zapier returned ${data.status}: ${data.body}`);
 
-      // Show success screen first — delay onPosted so it doesn't unmount this component
-      setPosted(true);
-      setTimeout(() => {
-        onPosted();
-        setView('calendar');
-      }, 2000);
+      // Parent closes modal, shows toast, saves project, and navigates
+      onPosted();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to send — check your Zapier webhook');
-    } finally {
       setPosting(false);
     }
   }
 
-  // ── Success screen ──────────────────────────────────────────────────────────
-  if (posted) {
-    return (
-      <div style={{
-        position: 'fixed', inset: 0, zIndex: 200,
-        background: 'rgba(1,24,54,0.85)', backdropFilter: 'blur(6px)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-      }}>
-        <div style={{
-          background: '#fff', borderRadius: 24, padding: '56px 64px',
-          textAlign: 'center', boxShadow: '0 32px 100px rgba(1,24,54,0.35)',
-          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16,
-        }}>
-          <div style={{
-            width: 72, height: 72, borderRadius: '50%', background: '#dcfce7',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            <Icon n="check" size={36} style={{ color: '#16a34a' }} />
-          </div>
-          <div style={{ fontFamily: "'Playfair Display',serif", fontSize: 26, fontWeight: 800, color: 'var(--navy-deep)' }}>
-            Posted to Instagram!
-          </div>
-          <div style={{ fontSize: 14, color: 'var(--muted)' }}>
-            Taking you to the calendar…
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // ── Preview screen ──────────────────────────────────────────────────────────
   return (
     <div
       style={{
@@ -167,7 +128,6 @@ export default function SocialPreview({ imageUrl, caption, hashtags, service, we
                 {fullCaption}
               </div>
             </div>
-
           </div>
         </div>
 

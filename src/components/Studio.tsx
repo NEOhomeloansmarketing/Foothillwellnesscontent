@@ -757,7 +757,8 @@ function PublishBar({ current, captureFrame, onSave, onToast, webhookUrl, onWebh
             setStage('idle');
             setImageUrl(null);
             onSave({ ...current, channels: ['instagram', 'google'], status: 'posted', postedAt: Date.now() });
-            onToast('Posted to Instagram ✓');
+            onToast('🎉 Posted to Instagram!');
+            setTimeout(() => setView('calendar'), 400);
           }}
         />
       )}
