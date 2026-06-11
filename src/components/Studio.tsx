@@ -967,16 +967,14 @@ export default function Studio({ projects, current, generating, onSelect, onUpda
       const node = document.getElementById('export-canvas');
       if (!node) return null;
       const opts = {
-        width: 1080,
-        height: 1080,
-        pixelRatio: 1,
-        skipFonts: true,          // fonts already loaded in browser — skip external fetch
-        cacheBust: false,
-        includeQueryParams: false,
+        width: 1080, height: 1080, pixelRatio: 1,
+        skipFonts: true, cacheBust: false, includeQueryParams: false,
       };
-      // Two passes: first warms image cache, second renders cleanly
-      await toPng(node, opts).catch(() => {});
-      return await toPng(node, opts);
+      // Race each pass against a 7s timeout so a stalled fetch never freezes the UI
+      const withTimeout = (p: Promise<string>) =>
+        Promise.race([p, new Promise<string>((_, rej) => setTimeout(() => rej(new Error('timeout')), 7000))]);
+      await withTimeout(toPng(node, opts)).catch(() => {});   // warm image cache
+      return await withTimeout(toPng(node, opts)).catch(() => null);
     } catch { return null; }
   }
 
