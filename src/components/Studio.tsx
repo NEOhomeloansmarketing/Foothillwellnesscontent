@@ -4,6 +4,7 @@ import Icon from './ui/Icon';
 import Social from './ui/Social';
 import Btn from './ui/Btn';
 import GraphicCanvas, { TEMPLATES } from './graphic/GraphicCanvas';
+import ReviewPicker from './ReviewPicker';
 import { AUD } from '@/lib/content';
 import { useStore } from '@/store';
 import type { ContentPiece, ChannelId, ChatMessage, FiveLaw, TextOverlay } from '@/types';
@@ -772,11 +773,12 @@ function PublishBar({ current, img, onSave, onToast }: {
 }
 
 // ─── Right panel: image controls + AI assistant ─────────────────────────────────
-function RightPanel({ current, img, imgPos, onImgPos, onSetImg, onUpdate, onToast, fileRef }: {
+function RightPanel({ current, img, imgPos, onImgPos, onSetImg, onUpdate, onToast, fileRef, onReplaceReview }: {
   current: ContentPiece; img: string | string[] | null;
   imgPos: { x: number; y: number }; onImgPos: (p: { x: number; y: number }) => void;
   onSetImg: (v: string | string[] | null) => void; onUpdate: (p: ContentPiece) => void;
   onToast: (msg: string) => void; fileRef: React.RefObject<HTMLInputElement | null>;
+  onReplaceReview: () => void;
 }) {
   const [showAIPanel, setShowAIPanel] = useState(false);
   const [chat, setChat] = useState<ChatMessage[]>([]);
@@ -940,15 +942,20 @@ function RightPanel({ current, img, imgPos, onImgPos, onSetImg, onUpdate, onToas
 
             {/* Testimonial used */}
             <div className="rp-section">
-              <div className="rp-label">Client Proof Used</div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                <div className="rp-label" style={{ margin: 0 }}>Client Review</div>
+                <button
+                  onClick={onReplaceReview}
+                  style={{ border: '1.5px solid var(--gold)', background: 'transparent', borderRadius: 8, padding: '4px 10px', fontSize: 11, fontWeight: 700, color: 'var(--gold-muted)', cursor: 'pointer', letterSpacing: '.04em' }}
+                >
+                  Replace Review
+                </button>
+              </div>
               <div style={{ background: 'var(--beige)', borderRadius: 12, padding: '14px 16px', borderLeft: '4px solid var(--gold)' }}>
                 <div style={{ fontFamily: "'Playfair Display',serif", fontStyle: 'italic', fontSize: 14, color: 'var(--navy-mid)', lineHeight: 1.55, marginBottom: 8 }}>
                   &ldquo;{g.quote?.replace(/^"|"$/g, '')}&rdquo;
                 </div>
                 <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--gold-muted)' }}>— {current.proofUsed}</div>
-                <div style={{ fontSize: 10.5, color: 'var(--muted)', marginTop: 4 }}>
-                  Matched to {current.service} specifically
-                </div>
               </div>
             </div>
 
@@ -1054,6 +1061,7 @@ export default function Studio({ projects, current, generating, onSelect, onUpda
   const [img, setImg] = useState<string | string[] | null>(null);
   const [imgPos, setImgPos] = useState({ x: 50, y: 35 });
   const [chans, setChans] = useState<ChannelId[]>(['instagram']);
+  const [showReviewPicker, setShowReviewPicker] = useState(false);
   const fileRef = useRef<HTMLInputElement | null>(null);
   const webhooks = useStore(s => s.webhooks);
 
@@ -1109,6 +1117,17 @@ export default function Studio({ projects, current, generating, onSelect, onUpda
     );
   }
 
+  function handleReviewSelect(review: { name: string; text: string }) {
+    if (!current) return;
+    const trimmed = review.text.length > 170 ? review.text.slice(0, 168).replace(/\s+\S*$/, '') + '…' : review.text;
+    onUpdate({
+      ...current,
+      proofUsed: review.name,
+      graphic: { ...current.graphic, quote: `"${trimmed}"`, proofName: review.name },
+    });
+    onToast(`Review updated — ${review.name}`);
+  }
+
   return (
     <div className="ed-layout">
       <input ref={fileRef} type="file" accept="image/*" hidden onChange={onFile} />
@@ -1125,7 +1144,16 @@ export default function Studio({ projects, current, generating, onSelect, onUpda
       <RightPanel
         current={current} img={img} imgPos={imgPos} onImgPos={setImgPos}
         onSetImg={setImg} onUpdate={onUpdate} onToast={onToast} fileRef={fileRef}
+        onReplaceReview={() => setShowReviewPicker(true)}
       />
+
+      {showReviewPicker && current && (
+        <ReviewPicker
+          current={current}
+          onSelect={handleReviewSelect}
+          onClose={() => setShowReviewPicker(false)}
+        />
+      )}
     </div>
   );
 }

@@ -1,4 +1,5 @@
-import { offerings, testimonials } from './brand';
+import { offerings } from './brand';
+import { getReviewsForService } from './testimonials';
 import type { AudienceId, GoalId, ContentPiece, FiveLaw, GenerateOptions, TemplateId, ChannelId, StatusType } from '@/types';
 
 export const AUD: Record<AudienceId, string> = {
@@ -161,21 +162,12 @@ export const SERVICE_INFO: Record<string, ServiceInfo> = {
 function pick<T>(arr: T[], seed: number): T { return arr[Math.abs(seed) % arr.length]; }
 function hashStr(s: string): number { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return h; }
 
-// Smart testimonial matching: service-specific first, then audience-tagged fallback
-function matchTestimonial(service: string, audience: AudienceId, used: string[]) {
-  // 1. Try to find testimonials that specifically mention this service
-  const byService = testimonials.filter(t => t.services?.includes(service));
-  const freshByService = byService.filter(t => !used.includes(t.name));
-  if (freshByService.length) return freshByService[Math.floor(Math.random() * freshByService.length)];
-  if (byService.length) return byService[Math.floor(Math.random() * byService.length)];
-
-  // 2. Fall back to audience-matched testimonials
-  const byAudience = testimonials.filter(t => t.tag === audience);
-  const freshByAudience = byAudience.filter(t => !used.includes(t.name));
-  if (freshByAudience.length) return freshByAudience[Math.floor(Math.random() * freshByAudience.length)];
-  if (byAudience.length) return byAudience[Math.floor(Math.random() * byAudience.length)];
-
-  return testimonials[0];
+// Pick a review for the given service, avoiding recently-used ones
+function matchTestimonial(service: string, _audience: AudienceId, used: string[]) {
+  const reviews = getReviewsForService(service);
+  const fresh = reviews.filter(r => !used.includes(r.name));
+  const pool = fresh.length ? fresh : reviews;
+  return pool[Math.floor(Math.random() * pool.length)];
 }
 
 // Curated Unsplash photo IDs by wellness theme

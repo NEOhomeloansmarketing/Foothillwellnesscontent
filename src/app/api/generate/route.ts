@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { AUD } from '@/lib/content';
-import { fiveLaws, testimonials } from '@/lib/brand';
+import { fiveLaws } from '@/lib/brand';
+import { getReviewsForService } from '@/lib/testimonials';
 import type { AudienceId } from '@/types';
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -9,17 +10,15 @@ const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 export async function POST(req: NextRequest) {
   const { service, audience, goal, notes, usedHooks = [], proofUsed } = await req.json();
 
-  // If the baked graphic already chose a specific testimonial, pin Claude to the same one
-  // so the graphic quote and caption always reference the same client.
-  let pinnedTestimonial = proofUsed ? testimonials.find(t => t.name === proofUsed) : null;
+  // Get service-specific reviews (falls back to generic if no match)
+  const reviews = getReviewsForService(service);
 
-  if (!pinnedTestimonial) {
-    const serviceTestimonials = testimonials.filter(t => t.services?.includes(service));
-    const audienceTestimonials = testimonials.filter(t => t.tag === audience && !serviceTestimonials.includes(t));
-    pinnedTestimonial = [...serviceTestimonials, ...audienceTestimonials][0] || testimonials[0];
-  }
+  // Pin to the specific review already on the graphic (if provided), otherwise pick first match
+  const pinned = (proofUsed ? reviews.find(r => r.name === proofUsed) : null) ?? reviews[0];
 
-  const proofBlock = `USE THIS EXACT CLIENT TESTIMONIAL in the caption proof section — do not paraphrase or invent a different one:\n"${pinnedTestimonial.text}" — ${pinnedTestimonial.name}`;
+  const proofBlock = pinned
+    ? `USE THIS EXACT CLIENT REVIEW VERBATIM in the caption — copy word-for-word, do not paraphrase:\n"${pinned.text}" — ${pinned.name}`
+    : '';
 
   const lawsBlock = fiveLaws.map(l => `  Law ${l.n}: ${l.name} — ${l.test}`).join('\n');
 
@@ -89,7 +88,7 @@ REQUIRED TESTIMONIAL — USE VERBATIM
 Your caption MUST include this exact client quote word-for-word in the Proof section.
 Do NOT paraphrase. Do NOT invent a different client. Copy the quote exactly:
 
-"${pinnedTestimonial.text}" — ${pinnedTestimonial.name}
+"${pinned?.text}" — ${pinned?.name}
 
 Return ONLY valid minified JSON (no markdown, no explanation):
 {"hook":"≤65-char hook — start with the CLIENT'S PROBLEM or a bold benefit that ${service} delivers. Must feel personal and urgent (e.g., 'Still sore days later? ${service} speeds recovery fast.')","emphasis":"1-3 word phrase from hook to italicize and highlight in gold","subhook":"one warm sentence that bridges from the problem to ${service} as the solution — use 'you'","caption":"full IG caption following Problem→Empathy→Guide→Plan→Proof→Speed→Ease→Action. Include the required testimonial quote verbatim. End with: 📞 Call or text (801) 784-0095 · Foothill Wellness, Salt Lake City","hashtags":["8 relevant hashtags with #"]}`;
