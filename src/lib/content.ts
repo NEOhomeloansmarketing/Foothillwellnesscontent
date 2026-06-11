@@ -224,10 +224,27 @@ export function bakedGenerate(opts: GenerateOptions): Omit<ContentPiece, 'id' | 
   const seed = hashStr(service + audience + goal + Date.now());
   const hookPool = HOOKS[audience] || HOOKS.energy;
   const freshHooks = hookPool.filter(h => !usedHooks.includes(h[0]));
-  const [hook, emphasis] = pick(freshHooks.length ? freshHooks : hookPool, seed);
   const t = matchTestimonial(service, audience, usedProof);
   const eyebrow = EYEBROW[audience];
   const subhook = `${service} ${SUBHOOK[audience]}`;
+
+  // Resolve service info first so hook can reference it
+  const info = SERVICE_INFO[service] || {} as Partial<ServiceInfo>;
+  const imgKeywords = info.img || 'general';
+  const [phook, pemph, pdesc] = PROBLEM[audience] || PROBLEM.energy;
+  const benefits: [string, string][] = (info.benefits || BENEFITS_FALLBACK[audience] || BENEFITS_FALLBACK.energy) as [string, string][];
+
+  // Service-specific hook: names the treatment so even the baked fallback is treatment-specific.
+  // Falls back to audience problem hooks when SERVICE_INFO has no tagline.
+  let hook: string, emphasis: string;
+  if (info.tagline) {
+    hook = `${service}: ${info.tagline}`;
+    const tagWords = info.tagline.replace(/[.,!?]/g, '').split(' ');
+    emphasis = tagWords.slice(-2).join(' ').trim();
+  } else {
+    [hook, emphasis] = pick(freshHooks.length ? freshHooks : hookPool, seed);
+  }
+
   const goalLine =
     goal === 'New Guest Special'
       ? `New here? Your New Guest Special is the easiest first step — no commitment, just a conversation.`
@@ -256,11 +273,6 @@ export function bakedGenerate(opts: GenerateOptions): Omit<ContentPiece, 'id' | 
     { law: 'Perceived speed', score: 4, note: `"Sooner than you expect" implies speed; could add a concrete timeframe.` },
     { law: 'Perceived ease', score: 5, note: `First step framed as a low-friction call/text — no commitment.` },
   ];
-
-  const info = SERVICE_INFO[service] || {} as Partial<ServiceInfo>;
-  const imgKeywords = info.img || 'general';
-  const [phook, pemph, pdesc] = PROBLEM[audience] || PROBLEM.energy;
-  const benefits: [string, string][] = (info.benefits || BENEFITS_FALLBACK[audience] || BENEFITS_FALLBACK.energy) as [string, string][];
 
   const proofMeta: Record<AudienceId, string> = {
     pain: 'Chronic pain relief client',

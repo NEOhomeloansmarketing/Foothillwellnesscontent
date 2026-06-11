@@ -85,7 +85,7 @@ export default function AppShell() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ service: opts.service, audience: opts.audience }),
-      }, 45000).then(r => r.json()).then(json => {
+      }, 58000).then(r => r.json()).then(json => {
         if (json.ok && json.dataUrl) aiImageUrl = json.dataUrl;
       }).catch(() => {});
 

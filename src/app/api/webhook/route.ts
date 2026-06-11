@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
     // ── Image ──────────────────────────────────────────────────────
     image_url: imageUrl,                          // Instagram "Photo URL" field
     photo_url: imageUrl,                          // Google My Business "Photo URL" field
-    image_base64: payload.imageBase64,            // fallback if no Blob token
+    // NOTE: image_base64 intentionally omitted — too large for Zapier's 3 MB webhook limit
 
     // ── Caption / Text ────────────────────────────────────────────
     caption: payload.fullCaption,                 // Instagram "Caption" field (caption + hashtags)

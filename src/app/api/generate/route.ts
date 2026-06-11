@@ -51,7 +51,7 @@ The hook must name the PROBLEM the audience already FEELS — before mentioning 
 End the caption with: "Call or text (801) 784-0095 · Foothill Wellness, Salt Lake City"
 
 Return ONLY valid minified JSON (no markdown fences, no explanation outside JSON):
-{"hook":"bold problem-led hook ≤60 chars","emphasis":"1-3 word phrase from hook to italicize","subhook":"one warm human sentence about what ${service} may do for them","caption":"full IG caption, plain text with line breaks","hashtags":["8 relevant hashtags with #"]}`;
+{"hook":"≤60-char hook that MUST include the word '${service}' and leads with a clear benefit or problem (e.g., 'Cryotherapy: fast recovery, zero inflammation.' or 'Infrared Sauna — deep heat that actually heals.')","emphasis":"1-3 word phrase from hook to italicize","subhook":"one warm human sentence naming ${service} and what it may do for the client's specific situation","caption":"full IG caption, plain text with line breaks","hashtags":["8 relevant hashtags with #"]}`;
 
   try {
     const message = await client.messages.create({
