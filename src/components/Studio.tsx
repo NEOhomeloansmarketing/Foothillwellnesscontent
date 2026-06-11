@@ -634,6 +634,7 @@ function PublishBar({ current, captureFrame, onSave, onToast, webhookUrl, onWebh
   webhookUrl?: string;
   onWebhookChange?: (url: string) => void;
 }) {
+  const setView = useStore(s => s.setView);
   const [stage, setStage] = useState<'idle' | 'capturing' | 'uploading' | 'preview'>('idle');
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -740,7 +741,7 @@ function PublishBar({ current, captureFrame, onSave, onToast, webhookUrl, onWebh
             setImageUrl(null);
             onSave({ ...current, channels: ['instagram', 'google'], status: 'posted', postedAt: Date.now() });
             onToast('Posted to Instagram ✓');
-            setTimeout(() => useStore.getState().setView('home'), 1200);
+            setTimeout(() => setView('home'), 1200);
           }}
         />
       )}
