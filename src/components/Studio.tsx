@@ -1097,9 +1097,17 @@ export default function Studio({ projects, current, generating, onSelect, onUpda
   function handleReviewSelect(review: { name: string; text: string }) {
     if (!current) return;
     const trimmed = review.text.length > 170 ? review.text.slice(0, 168).replace(/\s+\S*$/, '') + '…' : review.text;
+    const newProofLine = `"${trimmed}" — ${review.name}`;
+
+    // Replace the proof line in the caption — matches any "quoted text" — Name pattern
+    const updatedCaption = current.caption
+      ? current.caption.replace(/"[^"]*"\s*—\s*[^\n]+/, newProofLine)
+      : current.caption;
+
     onUpdate({
       ...current,
       proofUsed: review.name,
+      caption: updatedCaption ?? current.caption,
       graphic: { ...current.graphic, quote: `"${trimmed}"`, proofName: review.name },
     });
     onToast(`Review updated — ${review.name}`);
