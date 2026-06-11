@@ -6,16 +6,17 @@ async function uploadToImgBB(dataUrl: string): Promise<string | null> {
   const key = process.env.IMGBB_API_KEY;
   if (!key) { console.error('IMGBB_API_KEY not set'); return null; }
   try {
-    const base64 = dataUrl.replace(/^data:image\/\w+;base64,/, '');
-    const form = new URLSearchParams();
+    const base64 = dataUrl.replace(/^data:image\/[\w+]+;base64,/, '');
+    // FormData (multipart) avoids URL-encoding the base64 which would inflate it ~33%
+    const form = new FormData();
     form.append('key', key);
     form.append('image', base64);
-    const res = await fetch('https://api.imgbb.com/1/upload', {
-      method: 'POST',
-      body: form,
-    });
+    const res = await fetch('https://api.imgbb.com/1/upload', { method: 'POST', body: form });
     const json = await res.json();
-    if (!json.success) throw new Error(JSON.stringify(json.error));
+    if (!json.success) {
+      console.error('ImgBB rejected:', JSON.stringify(json));
+      throw new Error(json.error?.message || JSON.stringify(json));
+    }
     return json.data.url as string;
   } catch (e) {
     console.error('ImgBB upload error:', e);
@@ -29,8 +30,10 @@ export async function POST(req: NextRequest) {
 
   // Upload to ImgBB to get a public URL (required by Instagram)
   let imageUrl: string | null = null;
+  let imgbbError: string | null = null;
   if (payload.imageBase64) {
     imageUrl = await uploadToImgBB(payload.imageBase64);
+    if (!imageUrl) imgbbError = 'ImgBB upload failed — check IMGBB_API_KEY in Vercel env vars';
   }
 
   // Build a complete payload with every field Zapier might need
@@ -66,10 +69,16 @@ export async function POST(req: NextRequest) {
       body: JSON.stringify(fullPayload),
     });
     const text = await res.text();
-    // Zapier returns 2xx on success — treat any 2xx as ok regardless of body
-    return NextResponse.json({ ok: res.status >= 200 && res.status < 300, status: res.status, body: text, imageUrl });
+    const zapierOk = res.status >= 200 && res.status < 300;
+    return NextResponse.json({
+      ok: zapierOk,
+      status: res.status,
+      body: text,
+      imageUrl,
+      imgbbError,
+    });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    return NextResponse.json({ ok: false, error: msg }, { status: 500 });
+    return NextResponse.json({ ok: false, error: msg, imgbbError }, { status: 500 });
   }
 }

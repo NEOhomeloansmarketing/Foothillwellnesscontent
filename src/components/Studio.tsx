@@ -380,7 +380,7 @@ function CanvasPanel({ current, img, imgPos, onImgPos, onEditField, onUpdate, on
     ctx.textBaseline = 'middle';
     ctx.fillText('📞 Call or text (801) 784-0095', pillX + 24, pillY + pillH / 2);
 
-    return canvas.toDataURL('image/png');
+    return canvas.toDataURL('image/jpeg', 0.88);
   }
 
   function canvasWrapText(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, maxW: number, lineH: number): number {
@@ -728,9 +728,10 @@ function PublishBar({ current, generateImage, onSave, onToast }: {
         }),
       });
       const data = await res.json();
-      if (!data.ok) throw new Error(data.error || `Zapier error ${data.status}`);
+      if (data.imgbbError) throw new Error(data.imgbbError);
+      if (!data.ok) throw new Error(data.error || `Zapier returned ${data.status}`);
       onSave({ ...current, channels: ['instagram', 'google'], status: 'posted', postedAt: Date.now() });
-      onToast('Sent to Zapier ✓');
+      onToast('Sent to Instagram ✓');
     } catch (e) {
       onToast(e instanceof Error ? e.message : 'Failed — try again');
     } finally {

@@ -7,17 +7,19 @@ import type { AudienceId } from '@/types';
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 export async function POST(req: NextRequest) {
-  const { service, audience, goal, notes, usedHooks = [] } = await req.json();
+  const { service, audience, goal, notes, usedHooks = [], proofUsed } = await req.json();
 
-  // Pull service-specific testimonials first, then audience-tagged fallbacks
-  const serviceTestimonials = testimonials.filter(t => t.services?.includes(service));
-  const audienceTestimonials = testimonials.filter(t => t.tag === audience && !serviceTestimonials.includes(t));
-  const relevantProof = [...serviceTestimonials, ...audienceTestimonials].slice(0, 3);
+  // If the baked graphic already chose a specific testimonial, pin Claude to the same one
+  // so the graphic quote and caption always reference the same client.
+  let pinnedTestimonial = proofUsed ? testimonials.find(t => t.name === proofUsed) : null;
 
-  const proofBlock = relevantProof.length
-    ? `REAL CLIENT TESTIMONIALS (use one of these for the caption proof section):\n` +
-      relevantProof.map(t => `- "${t.text}" — ${t.name}`).join('\n')
-    : '';
+  if (!pinnedTestimonial) {
+    const serviceTestimonials = testimonials.filter(t => t.services?.includes(service));
+    const audienceTestimonials = testimonials.filter(t => t.tag === audience && !serviceTestimonials.includes(t));
+    pinnedTestimonial = [...serviceTestimonials, ...audienceTestimonials][0] || testimonials[0];
+  }
+
+  const proofBlock = `USE THIS EXACT CLIENT TESTIMONIAL in the caption proof section — do not paraphrase or invent a different one:\n"${pinnedTestimonial.text}" — ${pinnedTestimonial.name}`;
 
   const lawsBlock = fiveLaws.map(l => `  Law ${l.n}: ${l.name} — ${l.test}`).join('\n');
 
@@ -45,7 +47,7 @@ EXAMPLE PASS: "Still waking up stiff every morning? Your body is asking for help
 LAW 3 — Increase perceived likelihood of success.
 ✅ PASS: Include one specific client result, a real testimonial snippet, or a science-backed mechanism.
 ❌ FAIL: Vague hope ("feel your best!") with no proof or credibility signal.
-${proofBlock ? `USE ONE OF THESE REAL TESTIMONIALS:\n${proofBlock}` : ''}
+${proofBlock}
 
 LAW 4 — Increase perceived SPEED to the dream outcome.
 ✅ PASS: Convey that results come faster than they expect. Use phrases like "in as little as one session", "within days", "same-day relief", "in 30 minutes".

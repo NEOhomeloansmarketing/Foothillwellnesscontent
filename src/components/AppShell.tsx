@@ -74,7 +74,7 @@ export default function AppShell() {
       const textRes = await fetchWithTimeout('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ service: opts.service, audience: opts.audience, goal: opts.goal, notes: opts.notes, usedHooks }),
+        body: JSON.stringify({ service: opts.service, audience: opts.audience, goal: opts.goal, notes: opts.notes, usedHooks, proofUsed: content.proofUsed }),
       }, 38000);
       const json = await textRes.json();
       if (json.ok && json.data) {
