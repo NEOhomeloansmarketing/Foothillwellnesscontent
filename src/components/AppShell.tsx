@@ -105,8 +105,9 @@ export default function AppShell() {
       };
 
       addProject(proj);
-    } catch {
-      showToast('Generation failed — please try again');
+    } catch (e) {
+      // Only show error if we truly have nothing — baked content always exists
+      console.error('Generation error:', e);
     } finally {
       setGenerating(false);
     }

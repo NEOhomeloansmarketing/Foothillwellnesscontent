@@ -934,11 +934,16 @@ export default function Studio({ projects, current, generating, onSelect, onUpda
   }
 
   async function getExportDataUrl(): Promise<string | null> {
+    const timeout = <T,>(p: Promise<T>, ms: number): Promise<T> =>
+      Promise.race([p, new Promise<T>((_, rej) => setTimeout(() => rej(new Error('timeout')), ms))]);
     try {
       const { toPng } = await import('html-to-image');
       const node = document.getElementById('export-canvas');
       if (!node) return null;
-      return await toPng(node, { width: 1080, height: 1080, pixelRatio: 1, cacheBust: true });
+      const opts = { width: 1080, height: 1080, pixelRatio: 1 };
+      // First pass warms the image/font cache; second pass is the real render
+      await timeout(toPng(node, opts), 15000).catch(() => {});
+      return await timeout(toPng(node, opts), 15000);
     } catch { return null; }
   }
 
