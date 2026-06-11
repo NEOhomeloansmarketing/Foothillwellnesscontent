@@ -63,7 +63,8 @@ export async function POST(req: NextRequest) {
       body: JSON.stringify(fullPayload),
     });
     const text = await res.text();
-    return NextResponse.json({ ok: res.ok, status: res.status, body: text, imageUrl });
+    // Zapier returns 2xx on success — treat any 2xx as ok regardless of body
+    return NextResponse.json({ ok: res.status >= 200 && res.status < 300, status: res.status, body: text, imageUrl });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     return NextResponse.json({ ok: false, error: msg }, { status: 500 });
