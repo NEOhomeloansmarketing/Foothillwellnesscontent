@@ -48,7 +48,8 @@ export default function Flow({ onClose, onGenerate, contentType = 'ig-post' }: F
   const services = useMemo(() => flatServices(), []);
   const filtered = q ? services.filter(s => (s.name + s.cat).toLowerCase().includes(q.toLowerCase())) : services;
 
-  const canNext = [!!service, !!audience, isCustom ? !!customTopic : isEvent ? !!eventName : true][step];
+  const skipAudience = isEvent || isCustom;
+  const canNext = [!!service, skipAudience || !!audience, isCustom ? !!customTopic : isEvent ? !!eventName : true][step];
   const last = step === 2;
 
   function next() {
@@ -75,7 +76,8 @@ export default function Flow({ onClose, onGenerate, contentType = 'ig-post' }: F
       }
       onGenerate({ contentType, service: isCustom ? (customTopic || 'Custom') : service!.name, audience: audience!, goal, notes: finalNotes, userImage: photo });
     } else {
-      setStep(step + 1);
+      // skip audience step for Event/Custom
+      setStep(step === 0 && skipAudience ? 2 : step + 1);
     }
   }
 
@@ -237,7 +239,7 @@ export default function Flow({ onClose, onGenerate, contentType = 'ig-post' }: F
         </div>
 
         <div className="flow-foot">
-          <button className="btn btn-quiet" onClick={() => step === 0 ? onClose() : setStep(step - 1)}>
+          <button className="btn btn-quiet" onClick={() => step === 0 ? onClose() : setStep(step === 2 && skipAudience ? 0 : step - 1)}>
             {step === 0 ? 'Cancel' : '← Back'}
           </button>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
