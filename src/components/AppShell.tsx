@@ -15,7 +15,7 @@ import type { ContentPiece, GenerateOptions } from '@/types';
 export default function AppShell() {
   const {
     projects, current, view, flowOpen, generating, toast,
-    setCurrent, setView, setFlowOpen, setGenerating, setToast,
+    setCurrent, setView, setFlowOpen, setGenerating, setGenStep, setToast,
     updateCurrent, updateProject, addProject,
   } = useStore();
 
@@ -39,8 +39,8 @@ export default function AppShell() {
 
   async function runGenerate(opts: GenerateOptions & { userImage?: string | null }) {
     setFlowOpen(false);
-    setView('studio');
     setGenerating(true);
+    setGenStep('Writing your content with Claude AI...');
     setCurrent(null);
 
     const audienceShort: Record<string, string> = { pain: 'Pain', healing: 'Recovery', weight: 'Weight', energy: 'Energy' };
@@ -58,15 +58,16 @@ export default function AppShell() {
       return fetch(url, { ...init, signal: ctrl.signal }).finally(() => clearTimeout(timer));
     }
 
-    // ── Both Claude text AND DALL-E image run fully in background ──────────
-    // Studio always opens after 2.5 s with baked content; AI results arrive silently.
     let aiImageUrl: string | null = null;
 
-    const textPromise = fetchWithTimeout('/api/generate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ service: opts.service, audience: opts.audience, goal: opts.goal, notes: opts.notes, usedHooks }),
-    }, 28000).then(r => r.json()).then(json => {
+    // Phase 1: Claude text
+    try {
+      const textRes = await fetchWithTimeout('/api/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ service: opts.service, audience: opts.audience, goal: opts.goal, notes: opts.notes, usedHooks }),
+      }, 38000);
+      const json = await textRes.json();
       if (json.ok && json.data) {
         const d = json.data;
         content = {
@@ -76,18 +77,21 @@ export default function AppShell() {
           hashtags: d.hashtags?.length ? d.hashtags : content.hashtags,
         };
       }
-    }).catch(() => {});
+    } catch { /* use baked content */ }
 
-    const imagePromise = opts.userImage ? Promise.resolve() : fetchWithTimeout('/api/generate-image', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ service: opts.service, audience: opts.audience }),
-    }, 58000).then(r => r.json()).then(json => {
-      if (json.ok && json.dataUrl) aiImageUrl = json.dataUrl;
-    }).catch(() => {});
-
-    // Show Studio after the animation plays (2.5 s) — never waits for AI
-    await new Promise(r => setTimeout(r, 2500));
+    // Phase 2: DALL-E image (skip if user uploaded their own)
+    if (!opts.userImage) {
+      setGenStep('Generating your AI photo with DALL·E...');
+      try {
+        const imgRes = await fetchWithTimeout('/api/generate-image', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ service: opts.service, audience: opts.audience }),
+        }, 65000);
+        const imgJson = await imgRes.json();
+        if (imgJson.ok && imgJson.dataUrl) aiImageUrl = imgJson.dataUrl;
+      } catch { /* no image */ }
+    }
 
     if (opts.userImage) {
       (content as { autoImage: string | string[] }).autoImage = opts.userImage;
@@ -101,22 +105,13 @@ export default function AppShell() {
       status: 'draft',
       title: `${opts.service} · ${audienceShort[opts.audience]}`,
       ...content,
+      autoImage: aiImageUrl ?? (opts.userImage || content.autoImage),
     };
 
     addProject(proj);
-    setView('studio');
+    setGenStep('');
     setGenerating(false);
-
-    // ── AI results trickle in — update the project silently ───────────────
-    textPromise.then(() => {
-      updateProject({ ...proj, graphic: content.graphic, caption: content.caption, hashtags: content.hashtags });
-    }).catch(() => {});
-
-    if (!opts.userImage) {
-      imagePromise.then(() => {
-        if (aiImageUrl) updateProject({ ...proj, autoImage: aiImageUrl });
-      }).catch(() => {});
-    }
+    setView('studio');
   }
 
   function openProject(p: ContentPiece) {

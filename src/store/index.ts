@@ -15,6 +15,7 @@ interface AppStore {
   view: 'home' | 'studio' | 'calendar';
   flowOpen: boolean;
   generating: boolean;
+  genStep: string;
   toast: string | null;
   webhooks: Webhooks;
 
@@ -24,6 +25,7 @@ interface AppStore {
   updateProject: (p: ContentPiece) => void;
   setFlowOpen: (v: boolean) => void;
   setGenerating: (v: boolean) => void;
+  setGenStep: (s: string) => void;
   setToast: (msg: string | null) => void;
   updateCurrent: (p: ContentPiece) => void;
   addProject: (p: ContentPiece) => void;
@@ -39,6 +41,7 @@ export const useStore = create<AppStore>()(
       view: 'home',
       flowOpen: false,
       generating: false,
+      genStep: '',
       toast: null,
       webhooks: {
         instagram: 'https://hooks.zapier.com/hooks/catch/14659614/43606p9/',
@@ -50,6 +53,7 @@ export const useStore = create<AppStore>()(
       setView: (v) => set({ view: v }),
       setFlowOpen: (v) => set({ flowOpen: v }),
       setGenerating: (v) => set({ generating: v }),
+      setGenStep: (s) => set({ genStep: s }),
       setToast: (msg) => set({ toast: msg }),
       updateCurrent: (p) => set(state => ({
         current: p,

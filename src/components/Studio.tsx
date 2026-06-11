@@ -33,12 +33,8 @@ const GEN_STEPS = [
 ];
 
 // ─── Generation overlay ────────────────────────────────────────────────────────
-function GenOverlay() {
-  const [i, setI] = useState(0);
-  useEffect(() => {
-    const t = setInterval(() => setI(v => Math.min(v + 1, GEN_STEPS.length - 1)), 850);
-    return () => clearInterval(t);
-  }, []);
+function GenOverlay({ step }: { step: string }) {
+  const isImagePhase = step.includes('DALL');
   return (
     <div style={{
       position: 'absolute', inset: 0, zIndex: 30,
@@ -48,23 +44,27 @@ function GenOverlay() {
       <div style={{ textAlign: 'center' }}>
         <div style={{ width: 56, height: 56, borderRadius: '50%', border: '3px solid rgba(209,187,116,.25)', borderTopColor: '#D1BB74', margin: '0 auto 24px', animation: 'spin 1s linear infinite' }} />
         <div style={{ fontFamily: "'Playfair Display',serif", fontSize: 24, color: '#fff', fontWeight: 700, marginBottom: 8 }}>
-          Creating your content
+          {isImagePhase ? 'Almost ready…' : 'Writing your content'}
         </div>
-        <div style={{ fontSize: 13, color: 'rgba(255,255,255,.5)' }}>Powered by Claude + DALL·E 3</div>
+        <div style={{ fontSize: 13, color: 'rgba(255,255,255,.6)', marginTop: 4 }}>{step || 'Starting up…'}</div>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10, width: 320 }}>
-        {GEN_STEPS.map((s, k) => (
-          <div key={k} style={{ display: 'flex', alignItems: 'center', gap: 12, opacity: k <= i ? 1 : .3, transition: '.4s' }}>
+        {[
+          { label: 'Writing hook, caption & Five Laws', done: isImagePhase, active: !isImagePhase },
+          { label: 'Generating your AI photo with DALL·E', done: false, active: isImagePhase },
+          { label: 'Opening your editor', done: false, active: false },
+        ].map(({ label, done, active }, k) => (
+          <div key={k} style={{ display: 'flex', alignItems: 'center', gap: 12, opacity: done || active ? 1 : 0.35, transition: '.4s' }}>
             <div style={{
               width: 22, height: 22, borderRadius: '50%', flex: 'none',
-              background: k < i ? '#43a06a' : k === i ? 'rgba(209,187,116,.2)' : 'rgba(255,255,255,.08)',
-              border: `1.5px solid ${k < i ? '#43a06a' : k === i ? '#D1BB74' : 'rgba(255,255,255,.15)'}`,
+              background: done ? '#43a06a' : active ? 'rgba(209,187,116,.2)' : 'rgba(255,255,255,.08)',
+              border: `1.5px solid ${done ? '#43a06a' : active ? '#D1BB74' : 'rgba(255,255,255,.15)'}`,
               display: 'grid', placeItems: 'center',
             }}>
-              {k < i && <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={2.5} strokeLinecap="round"><path d="M5 12l5 5 9-11" /></svg>}
-              {k === i && <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#D1BB74' }} />}
+              {done && <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={2.5} strokeLinecap="round"><path d="M5 12l5 5 9-11" /></svg>}
+              {active && <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#D1BB74' }} />}
             </div>
-            <span style={{ fontSize: 13, color: k <= i ? '#fff' : 'rgba(255,255,255,.4)', fontWeight: k === i ? 600 : 400 }}>{s}</span>
+            <span style={{ fontSize: 13, color: done || active ? '#fff' : 'rgba(255,255,255,.4)', fontWeight: active ? 600 : 400 }}>{label}</span>
           </div>
         ))}
       </div>
@@ -306,30 +306,25 @@ function CanvasPanel({ current, img, imgPos, onImgPos, onEditField, onUpdate, on
   const hasImg = !!img;
   const overlays: TextOverlay[] = current.textOverlays || [];
 
-  // Capture the live rendered canvas frame at 1080px — exact match to the preview.
-  // Uses html-to-image which serialises already-loaded DOM/fonts without re-fetching,
-  // avoiding the hangs that plagued html2canvas on Next.js image URLs and Google Fonts.
+  // Capture the live rendered canvas frame at 1080px.
+  // skipFonts=true avoids fetching Google Fonts CDN (the root cause of the previous hangs).
   async function captureFrame(): Promise<string | null> {
     const el = frameRef.current;
     if (!el) return null;
     try {
       const { toPng } = await import('html-to-image');
       const pixelRatio = 1080 / canvasSize;
-
-      // 12 s hard cap — if the serialiser hangs we surface an error instead of spinning forever
       const dataUrl = await Promise.race([
         toPng(el, {
           pixelRatio,
-          cacheBust: false,      // use browser-cached resources, don't add cache-busting query strings
-          includeQueryParams: true,
-          skipFonts: false,      // fonts are already embedded by Next.js — include them
-          style: { transform: 'none' },  // neutralise any CSS transforms on the root element
+          cacheBust: false,
+          skipFonts: true,  // don't fetch Google Fonts CDN — use system fallbacks in export
+          style: { transform: 'none' },
         }),
         new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('capture timed out after 12 s')), 12000)
+          setTimeout(() => reject(new Error('capture timed out')), 20000)
         ),
       ]);
-
       return dataUrl;
     } catch (e) {
       console.error('captureFrame failed:', e);
@@ -978,6 +973,7 @@ export default function Studio({ projects, current, generating, onSelect, onUpda
   const [chans, setChans] = useState<ChannelId[]>(['instagram']);
   const fileRef = useRef<HTMLInputElement | null>(null);
   const webhooks = useStore(s => s.webhooks);
+  const genStep = useStore(s => s.genStep);
 
   useEffect(() => {
     // When the project switches, always reset position
@@ -1012,7 +1008,7 @@ export default function Studio({ projects, current, generating, onSelect, onUpda
   if (generating) {
     return (
       <div className="ed-layout">
-        <div style={{ gridColumn: '1/-1', position: 'relative' }}><GenOverlay /></div>
+        <div style={{ gridColumn: '1/-1', position: 'relative' }}><GenOverlay step={genStep} /></div>
       </div>
     );
   }
