@@ -54,7 +54,7 @@ export default function SocialPreview({ imageUrl, caption, hashtags, service, we
       const data = await res.json();
       if (!data.ok) throw new Error(data.error || `Zapier returned ${data.status}: ${data.body}`);
       onPosted();
-      setTimeout(() => setView('home'), 1000);
+      setTimeout(() => setView('calendar'), 1000);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to send — check your Zapier webhook');
     } finally {
