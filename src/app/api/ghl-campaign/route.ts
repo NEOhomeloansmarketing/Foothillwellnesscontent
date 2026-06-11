@@ -14,6 +14,19 @@ function ghlHeaders() {
   };
 }
 
+async function ghlPost(path: string, body: unknown) {
+  const res = await fetch(`${GHL_BASE}${path}`, {
+    method: 'POST',
+    headers: ghlHeaders(),
+    body: JSON.stringify(body),
+  });
+  const raw = await res.text();
+  console.log(`[ghl] POST ${path} → ${res.status}:`, raw.slice(0, 400));
+  let data: Record<string, unknown> = {};
+  try { data = JSON.parse(raw); } catch { /* non-JSON */ }
+  return { ok: res.ok, status: res.status, data, raw };
+}
+
 function buildHtml(ec: EmailContent): string {
   return `<!DOCTYPE html>
 <html>
@@ -22,14 +35,12 @@ function buildHtml(ec: EmailContent): string {
 <table width="100%" cellpadding="0" cellspacing="0" style="background:#F0EDE6;padding:32px 16px;">
   <tr><td align="center">
     <table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 32px rgba(1,24,54,.10);">
-      <!-- Header -->
       <tr><td style="background:#011836;padding:24px 40px;text-align:center;">
         <div style="font-family:Georgia,serif;font-size:22px;font-weight:800;color:#C9A84C;letter-spacing:.04em;">Foothill Wellness</div>
         <div style="font-size:11px;color:rgba(201,168,76,.65);margin-top:3px;letter-spacing:.12em;text-transform:uppercase;">Feel Better Faster</div>
       </td></tr>
-      <!-- Body -->
       <tr><td style="padding:32px 40px 24px;color:#1a2540;">
-        <p style="font-size:15px;line-height:1.75;margin:0 0 4px;font-weight:600;">Hello,</p>
+        <p style="font-size:15px;line-height:1.75;margin:0 0 4px;font-weight:600;">Hello {{contact.first_name}},</p>
         <p style="font-size:15px;line-height:1.75;margin:0 0 18px;">${ec.opening.replace(/\n/g, '<br>')}</p>
         <p style="font-size:15px;line-height:1.75;color:#3a4a6a;margin:0 0 20px;">${ec.empathy.replace(/\n/g, '<br>')}</p>
         <div style="border-left:3px solid #C9A84C;border-radius:0 8px 8px 0;background:#FAF8F3;padding:14px 18px;margin-bottom:20px;">
@@ -46,9 +57,9 @@ function buildHtml(ec: EmailContent): string {
         <p style="font-size:14px;line-height:1.7;color:#3a4a6a;margin:0 0 16px;white-space:pre-line;">${ec.closing}</p>
         ${ec.ps ? `<hr style="border:none;border-top:1px solid #e8e4da;margin:18px 0 14px;"><p style="font-size:13px;line-height:1.6;color:#6b7a99;font-style:italic;margin:0;">P.S. ${ec.ps}</p>` : ''}
       </td></tr>
-      <!-- Footer -->
       <tr><td style="background:#011836;padding:14px 40px;text-align:center;">
         <p style="font-size:11px;color:rgba(201,168,76,.55);letter-spacing:.06em;margin:0;">Foothill Wellness · 1414 S Foothill Dr, Salt Lake City, UT 84108</p>
+        <p style="font-size:10px;color:rgba(201,168,76,.35);margin:4px 0 0;">{{contact.unsubscribe_link}}</p>
       </td></tr>
     </table>
   </td></tr>
@@ -60,42 +71,32 @@ export async function POST(req: NextRequest) {
   const apiKey = process.env.GHL_API_KEY;
   const locationId = process.env.GHL_LOCATION_ID;
   if (!apiKey || !locationId) {
-    return NextResponse.json({ ok: false, error: 'GHL_API_KEY or GHL_LOCATION_ID not set in environment' }, { status: 500 });
+    return NextResponse.json({ ok: false, error: 'GHL_API_KEY or GHL_LOCATION_ID not configured in Vercel env vars' }, { status: 500 });
   }
 
   try {
     const { email, title } = await req.json() as { email: EmailContent; title: string };
     const html = buildHtml(email);
 
-    // Create email template in GHL (campaigns API not in public spec)
-    const body = {
+    // Step 1: Create email template
+    const tmpl = await ghlPost('/emails/templates', {
+      locationId,
       name: title || email.subject,
       subject: email.subject,
-      previewText: email.previewText || '',
-      fromName: 'Foothill Wellness',
-      fromEmail: 'info@foothillwellness.com',
-      replyToEmail: 'info@foothillwellness.com',
       html,
-      locationId,
-    };
-
-    const res = await fetch(`${GHL_BASE}/email-marketing/templates`, {
-      method: 'POST',
-      headers: ghlHeaders(),
-      body: JSON.stringify(body),
     });
 
-    const raw = await res.text();
-    console.log('[ghl-campaign] status:', res.status, 'body:', raw.slice(0, 500));
-
-    let data: Record<string, unknown> = {};
-    try { data = JSON.parse(raw); } catch { /* non-JSON response */ }
-
-    if (!res.ok) {
-      return NextResponse.json({ ok: false, error: data?.message || raw.slice(0, 200) || `GHL returned ${res.status}`, status: res.status }, { status: 502 });
+    if (!tmpl.ok) {
+      return NextResponse.json({
+        ok: false,
+        error: (tmpl.data?.message as string) || tmpl.raw.slice(0, 200) || `GHL returned ${tmpl.status}`,
+        status: tmpl.status,
+      }, { status: 502 });
     }
 
-    return NextResponse.json({ ok: true, campaignId: data.id ?? (data.campaign as Record<string, unknown>)?.id, data });
+    const templateId = tmpl.data.id as string | undefined;
+    return NextResponse.json({ ok: true, templateId, message: 'Email template created in GHL — open Email Marketing to send it.' });
+
   } catch (e) {
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
   }
