@@ -305,134 +305,30 @@ function CanvasPanel({ current, img, imgPos, onImgPos, onEditField, onUpdate, on
   const fieldDragStart = useRef<{ field: string; x: number; y: number; ox: number; oy: number } | null>(null);
   const frameRef = useRef<HTMLDivElement>(null);
   const canvasAreaRef = useRef<HTMLDivElement>(null);
+  const graphicRef = useRef<HTMLDivElement>(null);
   const hasImg = !!img;
   const overlays: TextOverlay[] = current.textOverlays || [];
 
-  // Canvas 2D export for download — wraps entire render in try/catch so it never throws.
+  // Capture the actual rendered graphic (whichever template is on screen) via html-to-image.
+  // skipFonts avoids hanging on Google Fonts CDN fetches.
   async function captureFrame(): Promise<string | null> {
+    const node = graphicRef.current;
+    if (!node) return null;
     try {
-      const SIZE = 1080;
-      const canvas = document.createElement('canvas');
-      canvas.width = SIZE;
-      canvas.height = SIZE;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return null;
-
-      const imgSrc = Array.isArray(img) ? img[0] : img;
-      if (imgSrc) {
-        await new Promise<void>(resolve => {
-          const el = document.createElement('img');
-          el.crossOrigin = 'anonymous';
-          el.onload = () => {
-            try {
-              const scale = Math.max(SIZE / el.naturalWidth, SIZE / el.naturalHeight);
-              const sw = el.naturalWidth * scale;
-              const sh = el.naturalHeight * scale;
-              ctx.drawImage(el, (SIZE - sw) * (imgPos.x / 100), (SIZE - sh) * (imgPos.y / 100), sw, sh);
-            } catch { /* tainted canvas — draw without image */ }
-            resolve();
-          };
-          el.onerror = () => {
-            // CORS blocked or URL expired — try without crossOrigin as last resort
-            const el2 = document.createElement('img');
-            el2.onload = () => {
-              try {
-                const scale = Math.max(SIZE / el2.naturalWidth, SIZE / el2.naturalHeight);
-                const sw = el2.naturalWidth * scale;
-                const sh = el2.naturalHeight * scale;
-                ctx.drawImage(el2, (SIZE - sw) * (imgPos.x / 100), (SIZE - sh) * (imgPos.y / 100), sw, sh);
-              } catch { /* still tainted */ }
-              resolve();
-            };
-            el2.onerror = () => resolve();
-            el2.src = imgSrc;
-          };
-          el.src = imgSrc;
-        });
-      } else {
-        ctx.fillStyle = '#011836';
-        ctx.fillRect(0, 0, SIZE, SIZE);
-      }
-
-      // Gradient overlay
-      const grad = ctx.createLinearGradient(0, 0, 0, SIZE);
-      grad.addColorStop(0, 'rgba(1,24,54,0.72)');
-      grad.addColorStop(0.35, 'rgba(1,24,54,0.08)');
-      grad.addColorStop(0.5, 'rgba(1,24,54,0)');
-      grad.addColorStop(0.68, 'rgba(1,24,54,0.55)');
-      grad.addColorStop(1, 'rgba(1,24,54,0.98)');
-      ctx.fillStyle = grad;
-      ctx.fillRect(0, 0, SIZE, SIZE);
-
-      // Gold bar — manual rounded rect (ctx.roundRect not available in all browsers)
-      ctx.fillStyle = '#D1BB74';
-      canvasRoundRect(ctx, 56, SIZE - 310, 60, 4, 2);
-      ctx.fill();
-
-      // Hook text
-      const g = current.graphic;
-      const hook = g.hook || '';
-      const hookLen = hook.length;
-      const hookSize = hookLen <= 14 ? 96 : hookLen >= 55 ? 52 : Math.round(96 - (96 - 52) * (hookLen - 14) / 41);
-      ctx.font = `800 ${hookSize}px serif`;
-      ctx.fillStyle = '#ffffff';
-      ctx.textBaseline = 'alphabetic';
-      const hookY = canvasWrapText(ctx, hook, 56, SIZE - 300, SIZE - 112, hookSize);
-
-      // Subhook
-      if (g.subhook) {
-        ctx.font = '300 26px sans-serif';
-        ctx.fillStyle = 'rgba(255,255,255,0.84)';
-        canvasWrapText(ctx, g.subhook, 56, hookY + 28, SIZE - 112, 38);
-      }
-
-      // CTA pill
-      const pillW = 580, pillH = 56, pillX = 56, pillY = SIZE - 82;
-      ctx.fillStyle = '#D1BB74';
-      canvasRoundRect(ctx, pillX, pillY, pillW, pillH, 28);
-      ctx.fill();
-      ctx.fillStyle = '#011836';
-      ctx.font = 'bold 21px sans-serif';
-      ctx.textBaseline = 'middle';
-      ctx.fillText('Call or text (801) 784-0095  ·  Foothill Wellness', pillX + 24, pillY + pillH / 2);
-
-      return canvas.toDataURL('image/jpeg', 0.92);
+      const { toJpeg } = await import('html-to-image');
+      const dataUrl = await toJpeg(node, {
+        quality: 0.92,
+        width: 1080,
+        height: 1080,
+        skipFonts: true,
+        pixelRatio: 1,
+        cacheBust: true,
+      });
+      return dataUrl;
     } catch (e) {
       console.error('captureFrame error:', e);
       return null;
     }
-  }
-
-  function canvasRoundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
-    ctx.beginPath();
-    ctx.moveTo(x + r, y);
-    ctx.lineTo(x + w - r, y);
-    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
-    ctx.lineTo(x + w, y + h - r);
-    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-    ctx.lineTo(x + r, y + h);
-    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
-    ctx.lineTo(x, y + r);
-    ctx.quadraticCurveTo(x, y, x + r, y);
-    ctx.closePath();
-  }
-
-  function canvasWrapText(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, maxW: number, lineH: number): number {
-    const words = text.split(' ');
-    let line = '';
-    let cy = y;
-    for (const word of words) {
-      const test = line ? line + ' ' + word : word;
-      if (ctx.measureText(test).width > maxW && line) {
-        ctx.fillText(line, x, cy);
-        cy += lineH;
-        line = word;
-      } else {
-        line = test;
-      }
-    }
-    if (line) { ctx.fillText(line, x, cy); cy += lineH; }
-    return cy;
   }
 
   // Responsive canvas size
@@ -566,8 +462,8 @@ function CanvasPanel({ current, img, imgPos, onImgPos, onEditField, onUpdate, on
           onMouseDown={onMouseDown}
           onClick={e => e.stopPropagation()}
         >
-          {/* Graphic */}
-          <div style={{ width: 1080, height: 1080, transform: `scale(${scale})`, transformOrigin: 'top left', position: 'absolute', top: 0, left: 0 }}>
+          {/* Graphic — graphicRef points at the full 1080×1080 render for export */}
+          <div ref={graphicRef} style={{ width: 1080, height: 1080, transform: `scale(${scale})`, transformOrigin: 'top left', position: 'absolute', top: 0, left: 0 }}>
             <GraphicCanvas
               tpl={current.template} content={g} img={img} imgPos={imgPos}
               edit={{
