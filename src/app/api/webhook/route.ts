@@ -1,21 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
 
 export const maxDuration = 60;
 
-async function uploadToBlob(dataUrl: string): Promise<string | null> {
-  if (!process.env.BLOB_READ_WRITE_TOKEN) return null;
+async function uploadToSupabase(dataUrl: string): Promise<string | null> {
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_KEY;
+  if (!url || !key) return null;
   try {
-    const { put } = await import('@vercel/blob');
+    const supabase = createClient(url, key);
     const [meta, base64] = dataUrl.split(',');
     const mime = meta.match(/:(.*?);/)?.[1] || 'image/png';
     const ext = mime.includes('jpeg') ? 'jpg' : 'png';
     const buffer = Buffer.from(base64, 'base64');
-    const blob = await put(`fw-post-${Date.now()}.${ext}`, buffer, {
-      access: 'public',
-      contentType: mime,
-    });
-    return blob.url;
-  } catch {
+    const filename = `fw-post-${Date.now()}.${ext}`;
+    const { error } = await supabase.storage
+      .from('post-images')
+      .upload(filename, buffer, { contentType: mime, upsert: true });
+    if (error) throw error;
+    const { data } = supabase.storage.from('post-images').getPublicUrl(filename);
+    return data.publicUrl;
+  } catch (e) {
+    console.error('Supabase upload error:', e);
     return null;
   }
 }
@@ -24,10 +30,10 @@ export async function POST(req: NextRequest) {
   const { webhookUrl, payload } = await req.json();
   if (!webhookUrl) return NextResponse.json({ ok: false, error: 'No webhook URL' }, { status: 400 });
 
-  // Upload image to get a public URL (required by Instagram Zapier action)
+  // Upload image to Supabase Storage to get a public URL (required by Instagram)
   let imageUrl: string | null = null;
   if (payload.imageBase64) {
-    imageUrl = await uploadToBlob(payload.imageBase64);
+    imageUrl = await uploadToSupabase(payload.imageBase64);
   }
 
   // Build a complete payload with every field Zapier might need
