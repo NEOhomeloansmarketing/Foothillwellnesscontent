@@ -39,7 +39,10 @@ export const useStore = create<AppStore>()(
       flowOpen: false,
       generating: false,
       toast: null,
-      webhooks: {},
+      webhooks: {
+        instagram: 'https://hooks.zapier.com/hooks/catch/14659614/43606p9/',
+        google: 'https://hooks.zapier.com/hooks/catch/14659614/43606p9/',
+      },
 
       setProjects: (projects) => set({ projects }),
       setCurrent: (p) => set({ current: p }),
