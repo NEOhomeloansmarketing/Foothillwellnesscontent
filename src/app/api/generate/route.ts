@@ -47,7 +47,6 @@ EXAMPLE PASS: "Still waking up stiff every morning? Your body is asking for help
 LAW 3 — Increase perceived likelihood of success.
 ✅ PASS: Include one specific client result, a real testimonial snippet, or a science-backed mechanism.
 ❌ FAIL: Vague hope ("feel your best!") with no proof or credibility signal.
-${proofBlock}
 
 LAW 4 — Increase perceived SPEED to the dream outcome.
 ✅ PASS: Convey that results come faster than they expect. Use phrases like "in as little as one session", "within days", "same-day relief", "in 30 minutes".
@@ -84,8 +83,16 @@ Before writing the JSON, verify:
 [ ] Caption makes the first step feel EASY with a clear CTA
 If any law fails, rewrite until all five pass.
 
+═══════════════════════════════════════
+REQUIRED TESTIMONIAL — USE VERBATIM
+═══════════════════════════════════════
+Your caption MUST include this exact client quote word-for-word in the Proof section.
+Do NOT paraphrase. Do NOT invent a different client. Copy the quote exactly:
+
+"${pinnedTestimonial.text}" — ${pinnedTestimonial.name}
+
 Return ONLY valid minified JSON (no markdown, no explanation):
-{"hook":"≤65-char hook — start with the CLIENT'S PROBLEM or a bold benefit that ${service} delivers. Must feel personal and urgent (e.g., 'Still sore days later? ${service} speeds recovery fast.')","emphasis":"1-3 word phrase from hook to italicize and highlight in gold","subhook":"one warm sentence that bridges from the problem to ${service} as the solution — use 'you'","caption":"full IG caption following Problem→Empathy→Guide→Plan→Proof→Speed→Ease→Action, plain text with line breaks, ends with phone/location line","hashtags":["8 relevant hashtags with #"]}`;
+{"hook":"≤65-char hook — start with the CLIENT'S PROBLEM or a bold benefit that ${service} delivers. Must feel personal and urgent (e.g., 'Still sore days later? ${service} speeds recovery fast.')","emphasis":"1-3 word phrase from hook to italicize and highlight in gold","subhook":"one warm sentence that bridges from the problem to ${service} as the solution — use 'you'","caption":"full IG caption following Problem→Empathy→Guide→Plan→Proof→Speed→Ease→Action. Include the required testimonial quote verbatim. End with: 📞 Call or text (801) 784-0095 · Foothill Wellness, Salt Lake City","hashtags":["8 relevant hashtags with #"]}`;
 
   try {
     const message = await client.messages.create({

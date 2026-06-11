@@ -304,83 +304,96 @@ function CanvasPanel({ current, img, imgPos, onImgPos, onEditField, onUpdate, on
   const hasImg = !!img;
   const overlays: TextOverlay[] = current.textOverlays || [];
 
-  // Pure Canvas 2D export — reads already-loaded base64 data URLs, zero network requests, never hangs.
+  // Canvas 2D export for download — wraps entire render in try/catch so it never throws.
   async function captureFrame(): Promise<string | null> {
-    const SIZE = 1080;
-    const canvas = document.createElement('canvas');
-    canvas.width = SIZE;
-    canvas.height = SIZE;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return null;
+    try {
+      const SIZE = 1080;
+      const canvas = document.createElement('canvas');
+      canvas.width = SIZE;
+      canvas.height = SIZE;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return null;
 
-    // 1. Background photo (img is already a base64 data URL from DALL-E or file upload)
-    const imgSrc = Array.isArray(img) ? img[0] : img;
-    if (imgSrc) {
-      await new Promise<void>(resolve => {
-        const image = new window.Image();
-        image.onload = () => {
-          const scale = Math.max(SIZE / image.naturalWidth, SIZE / image.naturalHeight);
-          const sw = image.naturalWidth * scale;
-          const sh = image.naturalHeight * scale;
-          const ox = (SIZE - sw) * (imgPos.x / 100);
-          const oy = (SIZE - sh) * (imgPos.y / 100);
-          ctx.drawImage(image, ox, oy, sw, sh);
-          resolve();
-        };
-        image.onerror = () => resolve();
-        image.src = imgSrc;
-      });
-    } else {
-      ctx.fillStyle = '#011836';
+      const imgSrc = Array.isArray(img) ? img[0] : img;
+      if (imgSrc) {
+        await new Promise<void>(resolve => {
+          const el = document.createElement('img');
+          el.onload = () => {
+            const scale = Math.max(SIZE / el.naturalWidth, SIZE / el.naturalHeight);
+            const sw = el.naturalWidth * scale;
+            const sh = el.naturalHeight * scale;
+            ctx.drawImage(el, (SIZE - sw) * (imgPos.x / 100), (SIZE - sh) * (imgPos.y / 100), sw, sh);
+            resolve();
+          };
+          el.onerror = () => resolve();
+          el.src = imgSrc;
+        });
+      } else {
+        ctx.fillStyle = '#011836';
+        ctx.fillRect(0, 0, SIZE, SIZE);
+      }
+
+      // Gradient overlay
+      const grad = ctx.createLinearGradient(0, 0, 0, SIZE);
+      grad.addColorStop(0, 'rgba(1,24,54,0.72)');
+      grad.addColorStop(0.35, 'rgba(1,24,54,0.08)');
+      grad.addColorStop(0.5, 'rgba(1,24,54,0)');
+      grad.addColorStop(0.68, 'rgba(1,24,54,0.55)');
+      grad.addColorStop(1, 'rgba(1,24,54,0.98)');
+      ctx.fillStyle = grad;
       ctx.fillRect(0, 0, SIZE, SIZE);
+
+      // Gold bar — manual rounded rect (ctx.roundRect not available in all browsers)
+      ctx.fillStyle = '#D1BB74';
+      canvasRoundRect(ctx, 56, SIZE - 310, 60, 4, 2);
+      ctx.fill();
+
+      // Hook text
+      const g = current.graphic;
+      const hook = g.hook || '';
+      const hookLen = hook.length;
+      const hookSize = hookLen <= 14 ? 96 : hookLen >= 55 ? 52 : Math.round(96 - (96 - 52) * (hookLen - 14) / 41);
+      ctx.font = `800 ${hookSize}px serif`;
+      ctx.fillStyle = '#ffffff';
+      ctx.textBaseline = 'alphabetic';
+      const hookY = canvasWrapText(ctx, hook, 56, SIZE - 300, SIZE - 112, hookSize);
+
+      // Subhook
+      if (g.subhook) {
+        ctx.font = '300 26px sans-serif';
+        ctx.fillStyle = 'rgba(255,255,255,0.84)';
+        canvasWrapText(ctx, g.subhook, 56, hookY + 28, SIZE - 112, 38);
+      }
+
+      // CTA pill
+      const pillW = 580, pillH = 56, pillX = 56, pillY = SIZE - 82;
+      ctx.fillStyle = '#D1BB74';
+      canvasRoundRect(ctx, pillX, pillY, pillW, pillH, 28);
+      ctx.fill();
+      ctx.fillStyle = '#011836';
+      ctx.font = 'bold 21px sans-serif';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('Call or text (801) 784-0095  ·  Foothill Wellness', pillX + 24, pillY + pillH / 2);
+
+      return canvas.toDataURL('image/jpeg', 0.92);
+    } catch (e) {
+      console.error('captureFrame error:', e);
+      return null;
     }
+  }
 
-    // 2. Gradient overlay (matches full-bleed photo template)
-    const grad = ctx.createLinearGradient(0, 0, 0, SIZE);
-    grad.addColorStop(0,    'rgba(1,24,54,0.72)');
-    grad.addColorStop(0.35, 'rgba(1,24,54,0.08)');
-    grad.addColorStop(0.5,  'rgba(1,24,54,0)');
-    grad.addColorStop(0.68, 'rgba(1,24,54,0.55)');
-    grad.addColorStop(1,    'rgba(1,24,54,0.98)');
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, SIZE, SIZE);
-
-    // 3. Gold accent bar
-    ctx.fillStyle = '#D1BB74';
+  function canvasRoundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
     ctx.beginPath();
-    ctx.roundRect(56, SIZE - 310, 60, 4, 2);
-    ctx.fill();
-
-    // 4. Hook text
-    const g = current.graphic;
-    const hook = g.hook || '';
-    const hookLen = hook.length;
-    const hookSize = hookLen <= 14 ? 96 : hookLen >= 55 ? 52 : Math.round(96 - (96 - 52) * (hookLen - 14) / 41);
-    ctx.font = `800 ${hookSize}px serif`;
-    ctx.fillStyle = '#ffffff';
-    ctx.textBaseline = 'alphabetic';
-    const hookY = canvasWrapText(ctx, hook, 56, SIZE - 300, SIZE - 112, hookSize * 1.0);
-
-    // 5. Subhook text
-    if (g.subhook) {
-      ctx.font = '300 26px sans-serif';
-      ctx.fillStyle = 'rgba(255,255,255,0.84)';
-      canvasWrapText(ctx, g.subhook, 56, hookY + 28, SIZE - 112, 38);
-    }
-
-    // 6. CTA pill (simple text line at bottom)
-    ctx.font = 'bold 22px sans-serif';
-    ctx.fillStyle = '#011836';
-    const pillW = 560, pillH = 56, pillX = 56, pillY = SIZE - 80;
-    ctx.fillStyle = '#D1BB74';
-    ctx.beginPath();
-    ctx.roundRect(pillX, pillY, pillW, pillH, 28);
-    ctx.fill();
-    ctx.fillStyle = '#011836';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('📞 Call or text (801) 784-0095', pillX + 24, pillY + pillH / 2);
-
-    return canvas.toDataURL('image/jpeg', 0.88);
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx.lineTo(x + r, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
   }
 
   function canvasWrapText(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, maxW: number, lineH: number): number {
@@ -688,7 +701,7 @@ function CanvasPanel({ current, img, imgPos, onImgPos, onEditField, onUpdate, on
       </div>
 
       {/* Publish bar */}
-      <PublishBar current={current} generateImage={captureFrame} onSave={onSave} onToast={onToast} />
+      <PublishBar current={current} img={img} onSave={onSave} onToast={onToast} />
     </div>
   );
 }
@@ -696,9 +709,9 @@ function CanvasPanel({ current, img, imgPos, onImgPos, onEditField, onUpdate, on
 // ─── Publish bar ─────────────────────────────────────────────────────────────
 const ZAPIER_WEBHOOK = 'https://hooks.zapier.com/hooks/catch/14659614/43606p9/';
 
-function PublishBar({ current, generateImage, onSave, onToast }: {
+function PublishBar({ current, img, onSave, onToast }: {
   current: ContentPiece;
-  generateImage: () => Promise<string | null>;
+  img: string | string[] | null;
   onSave: (p: ContentPiece) => void;
   onToast: (msg: string) => void;
 }) {
@@ -706,12 +719,12 @@ function PublishBar({ current, generateImage, onSave, onToast }: {
 
   async function handlePost() {
     setPosting(true);
-    onToast('Building image…');
+    onToast('Sending to Instagram…');
     try {
-      const dataUrl = await generateImage();
-      if (!dataUrl) throw new Error('Image render failed');
+      // Use the DALL-E image stored in state — no canvas capture needed
+      const imgSrc = Array.isArray(img) ? img[0] : img;
+      const imageBase64 = imgSrc || (Array.isArray(current.autoImage) ? current.autoImage[0] : current.autoImage) || null;
 
-      onToast('Uploading & sending…');
       const res = await fetch('/api/webhook', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -721,7 +734,7 @@ function PublishBar({ current, generateImage, onSave, onToast }: {
             caption: current.caption,
             hashtags: current.hashtags.join(' '),
             fullCaption: current.caption + '\n\n' + current.hashtags.join(' '),
-            imageBase64: dataUrl,
+            imageBase64,
             service: current.service,
             timestamp: new Date().toISOString(),
           },
@@ -729,7 +742,7 @@ function PublishBar({ current, generateImage, onSave, onToast }: {
       });
       const data = await res.json();
       if (data.imgbbError) throw new Error(data.imgbbError);
-      if (!data.ok) throw new Error(data.error || `Zapier returned ${data.status}`);
+      if (!data.ok) throw new Error(data.error || `Zapier returned ${data.status}: ${data.body}`);
       onSave({ ...current, channels: ['instagram', 'google'], status: 'posted', postedAt: Date.now() });
       onToast('Sent to Instagram ✓');
     } catch (e) {
