@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import Icon from './ui/Icon';
+import { useStore } from '@/store';
 
 interface Props {
   imageUrl: string;
@@ -23,6 +24,7 @@ function formatCaption(raw: string): string {
 }
 
 export default function SocialPreview({ imageUrl, caption, hashtags, service, webhookUrl, onPosted, onClose }: Props) {
+  const setView = useStore(s => s.setView);
   const [posting, setPosting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const cleanCaption = formatCaption(caption);
@@ -52,6 +54,7 @@ export default function SocialPreview({ imageUrl, caption, hashtags, service, we
       const data = await res.json();
       if (!data.ok) throw new Error(data.error || `Zapier returned ${data.status}: ${data.body}`);
       onPosted();
+      setTimeout(() => setView('home'), 1000);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to send — check your Zapier webhook');
     } finally {
