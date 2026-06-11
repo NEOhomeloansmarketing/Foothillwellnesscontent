@@ -288,13 +288,11 @@ interface CanvasProps {
   onImgPos: (pos: { x: number; y: number }) => void;
   onEditField: (field: string, val: string) => void;
   onUpdate: (p: ContentPiece) => void;
-  onExport: () => void;
   onToast: (msg: string) => void;
   onSave: (p: ContentPiece) => void;
-  getExportDataUrl: () => Promise<string | null>;
 }
 
-function CanvasPanel({ current, img, imgPos, onImgPos, onEditField, onUpdate, onExport, onToast, onSave, getExportDataUrl }: CanvasProps) {
+function CanvasPanel({ current, img, imgPos, onImgPos, onEditField, onUpdate, onToast, onSave }: CanvasProps) {
   const [showCaption, setShowCaption] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [selectedOverlay, setSelectedOverlay] = useState<string | null>(null);
@@ -416,7 +414,22 @@ function CanvasPanel({ current, img, imgPos, onImgPos, onEditField, onUpdate, on
               <Icon n="refresh" size={12} /> Reset Layout
             </button>
           )}
-          <Btn variant="navy" icon="download" onClick={onExport}>Export PNG</Btn>
+          <Btn variant="navy" icon="download" onClick={async () => {
+            onToast('Generating image…');
+            const firstImg = Array.isArray(img) ? img[0] : img;
+            const res = await fetch('/api/post-graphic', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ template: current.template, content: current.graphic, imageBase64: firstImg, download: true }),
+            });
+            if (!res.ok) { onToast('Export failed — try again'); return; }
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = 'foothill-post.png'; a.click();
+            URL.revokeObjectURL(url);
+            onToast('Downloaded!');
+          }}>Export PNG</Btn>
         </div>
       </div>
 
@@ -585,12 +598,7 @@ function CanvasPanel({ current, img, imgPos, onImgPos, onEditField, onUpdate, on
       </div>
 
       {/* Publish bar */}
-      <PublishBar
-        current={current}
-        onSave={onSave}
-        onToast={onToast}
-        getExportDataUrl={getExportDataUrl}
-      />
+      <PublishBar current={current} img={img} onSave={onSave} onToast={onToast} />
     </div>
   );
 }
@@ -598,42 +606,37 @@ function CanvasPanel({ current, img, imgPos, onImgPos, onEditField, onUpdate, on
 // ─── Publish bar ─────────────────────────────────────────────────────────────
 const ZAPIER_WEBHOOK = 'https://hooks.zapier.com/hooks/catch/14659614/43606p9/';
 
-function PublishBar({ current, onSave, onToast, getExportDataUrl }: {
+function PublishBar({ current, img, onSave, onToast }: {
   current: ContentPiece;
+  img: string | string[] | null;
   onSave: (p: ContentPiece) => void;
   onToast: (msg: string) => void;
-  getExportDataUrl: () => Promise<string | null>;
 }) {
   const [posting, setPosting] = useState(false);
 
   async function handlePost() {
     setPosting(true);
-    onToast('Exporting image…');
+    onToast('Generating & sending…');
     try {
-      const dataUrl = await getExportDataUrl();
-      if (!dataUrl) throw new Error('Could not export canvas');
-
-      const payload = {
-        service: current.service,
-        caption: current.caption,
-        hashtags: current.hashtags.join(' '),
-        fullCaption: current.caption + '\n\n' + current.hashtags.join(' '),
-        imageBase64: dataUrl,
-        timestamp: new Date().toISOString(),
-      };
-
-      const res = await fetch('/api/webhook', {
+      const firstImg = Array.isArray(img) ? img[0] : img;
+      const res = await fetch('/api/post-graphic', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ webhookUrl: ZAPIER_WEBHOOK, payload }),
+        body: JSON.stringify({
+          template: current.template,
+          content: current.graphic,
+          imageBase64: firstImg,
+          caption: current.caption,
+          hashtags: current.hashtags,
+          webhookUrl: ZAPIER_WEBHOOK,
+        }),
       });
       const data = await res.json();
-      if (!data.ok) throw new Error(data.error || `Zapier returned ${data.status}`);
-
+      if (!data.ok) throw new Error('Zapier did not confirm — check webhook');
       onSave({ ...current, channels: ['instagram', 'google'], status: 'posted' });
       onToast('Sent to Zapier ✓');
     } catch (e) {
-      onToast(e instanceof Error ? e.message : 'Failed — check webhook');
+      onToast(e instanceof Error ? e.message : 'Failed — try again');
     } finally {
       setPosting(false);
     }
@@ -961,37 +964,6 @@ export default function Studio({ projects, current, generating, onSelect, onUpda
     onUpdate({ ...current, graphic: { ...current.graphic, [field]: val } });
   }
 
-  async function getExportDataUrl(): Promise<string | null> {
-    try {
-      const html2canvas = (await import('html2canvas')).default;
-      const node = document.getElementById('export-canvas');
-      if (!node) return null;
-      const canvas = await html2canvas(node, {
-        width: 1080, height: 1080, scale: 1,
-        useCORS: true, allowTaint: true,
-        backgroundColor: null, logging: false,
-      });
-      return canvas.toDataURL('image/png');
-    } catch (e) {
-      console.error('Export error:', e);
-      return null;
-    }
-  }
-
-  async function exportPng() {
-    if (!current) return;
-    try {
-      const url = await getExportDataUrl();
-      if (url) {
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = current.service.replace(/[^a-z0-9]/gi, '-').toLowerCase() + '-post.png';
-        a.click();
-        onToast('Downloaded ' + a.download);
-      }
-    } catch { onToast('Export failed — try again'); }
-  }
-
   function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0]; if (!f) return;
     const r = new FileReader();
@@ -1023,12 +995,6 @@ export default function Studio({ projects, current, generating, onSelect, onUpda
 
   return (
     <div className="ed-layout">
-      {/* hidden export node */}
-      <div style={{ position: 'fixed', left: -99999, top: 0 }}>
-        <div id="export-canvas" style={{ width: 1080, height: 1080, position: 'relative' }}>
-          <GraphicCanvas tpl={current.template} content={current.graphic} img={img} imgPos={imgPos} />
-        </div>
-      </div>
       <input ref={fileRef} type="file" accept="image/*" hidden onChange={onFile} />
 
       <LeftPanel
@@ -1037,8 +1003,7 @@ export default function Studio({ projects, current, generating, onSelect, onUpda
 
       <CanvasPanel
         current={current} img={img} imgPos={imgPos} onImgPos={setImgPos}
-        onEditField={editField} onUpdate={onUpdate} onExport={exportPng} onToast={onToast}
-        onSave={onSave} getExportDataUrl={getExportDataUrl}
+        onEditField={editField} onUpdate={onUpdate} onToast={onToast} onSave={onSave}
       />
 
       <RightPanel
