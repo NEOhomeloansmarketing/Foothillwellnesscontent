@@ -82,6 +82,7 @@ export default function EmailEditor({ current, onUpdate, onToast }: Props) {
   const [aiDraft, setAiDraft] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
   const [aiHistory, setAiHistory] = useState<{ role: 'user' | 'ai'; text: string }[]>([]);
+  const [ghlSending, setGhlSending] = useState(false);
   const feedRef = useRef<HTMLDivElement>(null);
 
   const ec = current.emailContent ?? {
@@ -109,6 +110,27 @@ export default function EmailEditor({ current, onUpdate, onToast }: Props) {
     const proofLine = `"${trimmed}" — ${review.name}`;
     update('proof', proofLine);
     onToast(`Review updated — ${review.name}`);
+  }
+
+  async function sendToGHL() {
+    if (ghlSending) return;
+    setGhlSending(true);
+    try {
+      const res = await fetch('/api/ghl-campaign', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: ec, title: current.title }),
+      });
+      const json = await res.json();
+      if (json.ok) {
+        onToast('Draft campaign created in Go High Level!');
+      } else {
+        onToast(`GHL error: ${json.error ?? 'Unknown error'}`);
+      }
+    } catch {
+      onToast('Network error — could not reach GHL');
+    }
+    setGhlSending(false);
   }
 
   async function sendAI() {
@@ -273,12 +295,31 @@ export default function EmailEditor({ current, onUpdate, onToast }: Props) {
               </button>
             ))}
           </div>
-          <button
-            onClick={() => { navigator.clipboard?.writeText(assembleFullEmail(ec)); onToast('Email copied!'); }}
-            style={{ fontSize: 11, fontWeight: 700, color: 'var(--navy-mid)', background: 'var(--cream)', border: '1.5px solid var(--line)', borderRadius: 7, padding: '6px 12px', cursor: 'pointer', flexShrink: 0 }}
-          >
-            Copy
-          </button>
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            <button
+              onClick={() => { navigator.clipboard?.writeText(assembleFullEmail(ec)); onToast('Email copied!'); }}
+              style={{ fontSize: 11, fontWeight: 700, color: 'var(--navy-mid)', background: 'var(--cream)', border: '1.5px solid var(--line)', borderRadius: 7, padding: '6px 10px', cursor: 'pointer', flexShrink: 0 }}
+            >
+              Copy
+            </button>
+            <button
+              onClick={sendToGHL}
+              disabled={ghlSending || isLoading}
+              title="Send as draft campaign in Go High Level"
+              style={{
+                fontSize: 11, fontWeight: 700, flexShrink: 0,
+                color: ghlSending || isLoading ? 'var(--muted)' : '#fff',
+                background: ghlSending || isLoading ? 'var(--line-soft)' : 'var(--navy-deep)',
+                border: 'none', borderRadius: 7, padding: '6px 10px',
+                cursor: ghlSending || isLoading ? 'not-allowed' : 'pointer',
+                display: 'flex', alignItems: 'center', gap: 5,
+              }}
+            >
+              {ghlSending
+                ? <><div className="spin" style={{ width: 12, height: 12, borderWidth: 2 }} /> Sending…</>
+                : '↑ GHL Draft'}
+            </button>
+          </div>
         </div>
 
         {/* AI TAB */}
