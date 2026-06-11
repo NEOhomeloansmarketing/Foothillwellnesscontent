@@ -6,6 +6,7 @@ import Btn from './ui/Btn';
 import Home from './Home';
 import Flow from './Flow';
 import Studio from './Studio';
+import Calendar from './Calendar';
 import { useStore } from '@/store';
 import { bakedGenerate } from '@/lib/content';
 import { contentTypes } from '@/lib/brand';
@@ -15,7 +16,7 @@ export default function AppShell() {
   const {
     projects, current, view, flowOpen, generating, toast,
     setCurrent, setView, setFlowOpen, setGenerating, setToast,
-    updateCurrent, addProject,
+    updateCurrent, updateProject, addProject,
   } = useStore();
 
   const toastT = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -43,66 +44,58 @@ export default function AppShell() {
     setCurrent(null);
 
     const audienceShort: Record<string, string> = { pain: 'Pain', healing: 'Recovery', weight: 'Weight', energy: 'Energy' };
-
-    // bakedGenerate always succeeds — this is our guaranteed fallback content
     const usedHooks = projects.filter(p => p.service === opts.service).map(p => p.graphic.hook);
     const usedProof = projects.filter(p => p.audience === opts.audience).map(p => p.proofUsed).filter(Boolean);
     let content = bakedGenerate({ ...opts, usedHooks, usedProof });
-    let aiImageUrl: string | null = null;
 
     if (usedHooks.length) {
       setTimeout(() => showToast(`Steering away from ${usedHooks.length} past hook${usedHooks.length > 1 ? 's' : ''} for ${opts.service}`), 1000);
     }
 
-    try {
-      const minWait = new Promise(r => setTimeout(r, 4800));
-
-      // Helper: fetch with a hard timeout so Promise.all never hangs
-      function fetchWithTimeout(url: string, init: RequestInit, ms: number) {
-        const ctrl = new AbortController();
-        const timer = setTimeout(() => ctrl.abort(), ms);
-        return fetch(url, { ...init, signal: ctrl.signal })
-          .finally(() => clearTimeout(timer));
-      }
-
-      const textPromise = fetchWithTimeout('/api/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ service: opts.service, audience: opts.audience, goal: opts.goal, notes: opts.notes, usedHooks }),
-      }, 30000).then(r => r.json()).then(json => {
-        if (json.ok && json.data) {
-          const d = json.data;
-          content = {
-            ...content,
-            graphic: { ...content.graphic, hook: d.hook || content.graphic.hook, emphasis: d.emphasis || content.graphic.emphasis, subhook: d.subhook || content.graphic.subhook },
-            caption: d.caption || content.caption,
-            hashtags: d.hashtags?.length ? d.hashtags : content.hashtags,
-          };
-        }
-      }).catch(() => {});
-
-      const imagePromise = opts.userImage ? Promise.resolve() : fetchWithTimeout('/api/generate-image', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ service: opts.service, audience: opts.audience }),
-      }, 58000).then(r => r.json()).then(json => {
-        if (json.ok && json.dataUrl) aiImageUrl = json.dataUrl;
-      }).catch(() => {});
-
-      await Promise.all([minWait, textPromise, imagePromise]);
-    } catch (e) {
-      console.error('Generation API error (using baked fallback):', e);
+    function fetchWithTimeout(url: string, init: RequestInit, ms: number) {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), ms);
+      return fetch(url, { ...init, signal: ctrl.signal }).finally(() => clearTimeout(timer));
     }
 
-    // Always land in Studio with content — baked content is the guaranteed fallback
+    // ── Text generation — wait for this before showing Studio ──────────────
+    const textPromise = fetchWithTimeout('/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ service: opts.service, audience: opts.audience, goal: opts.goal, notes: opts.notes, usedHooks }),
+    }, 28000).then(r => r.json()).then(json => {
+      if (json.ok && json.data) {
+        const d = json.data;
+        content = {
+          ...content,
+          graphic: { ...content.graphic, hook: d.hook || content.graphic.hook, emphasis: d.emphasis || content.graphic.emphasis, subhook: d.subhook || content.graphic.subhook },
+          caption: d.caption || content.caption,
+          hashtags: d.hashtags?.length ? d.hashtags : content.hashtags,
+        };
+      }
+    }).catch(() => {});
+
+    // ── Image generation — started in background, does NOT block Studio ───
+    let aiImageUrl: string | null = null;
+    const imagePromise = opts.userImage ? Promise.resolve() : fetchWithTimeout('/api/generate-image', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ service: opts.service, audience: opts.audience }),
+    }, 58000).then(r => r.json()).then(json => {
+      if (json.ok && json.dataUrl) aiImageUrl = json.dataUrl;
+    }).catch(() => {});
+
+    // Wait for text + minimum animation time, then open Studio immediately
+    try { await Promise.all([new Promise(r => setTimeout(r, 4800)), textPromise]); }
+    catch (e) { console.error('Text generation error:', e); }
+
     if (opts.userImage) {
       (content as { autoImage: string | string[] }).autoImage = opts.userImage;
-    } else if (aiImageUrl) {
-      (content as { autoImage: string }).autoImage = aiImageUrl;
     }
 
+    const projId = 'p' + Math.random().toString(36).slice(2, 8);
     const proj: ContentPiece = {
-      id: 'p' + Math.random().toString(36).slice(2, 8),
+      id: projId,
       createdAt: Date.now(),
       channels: [],
       status: 'draft',
@@ -111,8 +104,15 @@ export default function AppShell() {
     };
 
     addProject(proj);
-    setView('studio');   // re-assert in case anything reset it during the async wait
+    setView('studio');
     setGenerating(false);
+
+    // ── Image arrives in background — update the project silently ─────────
+    if (!opts.userImage) {
+      imagePromise.then(() => {
+        if (aiImageUrl) updateProject({ ...proj, autoImage: aiImageUrl });
+      }).catch(() => {});
+    }
   }
 
   function openProject(p: ContentPiece) {
@@ -130,7 +130,7 @@ export default function AppShell() {
         <div className="topnav">
           <button className={view === 'home' ? 'active' : ''} onClick={() => setView('home')}>Create</button>
           <button className={view === 'studio' ? 'active' : ''} onClick={() => { setCurrent(current || projects[0] || null); setView('studio'); }}>Library</button>
-          <button onClick={() => showToast('Calendar view — connect accounts to schedule')}>Calendar</button>
+          <button className={view === 'calendar' ? 'active' : ''} onClick={() => setView('calendar')}>Calendar</button>
         </div>
         <div className="spacer" />
         <button className="iconbtn" onClick={() => showToast('All caught up — no new alerts')}><Icon n="bell" size={18} /></button>
@@ -138,18 +138,20 @@ export default function AppShell() {
         <div className="avatar" title="Foothill Wellness">FW</div>
       </div>
 
-      {view === 'home'
-        ? <Home projects={projects} onPick={pick} onOpen={openProject} />
-        : <Studio
-            projects={projects}
-            current={current}
-            generating={generating}
-            onSelect={setCurrent}
-            onUpdate={updateCurrent}
-            onSave={updateCurrent}
-            onPick={pick}
-            onToast={showToast}
-          />}
+      {view === 'home' && <Home projects={projects} onPick={pick} onOpen={openProject} />}
+      {view === 'calendar' && <Calendar projects={projects} onOpen={openProject} />}
+      {(view === 'studio' || generating) && (
+        <Studio
+          projects={projects}
+          current={current}
+          generating={generating}
+          onSelect={setCurrent}
+          onUpdate={updateCurrent}
+          onSave={updateCurrent}
+          onPick={pick}
+          onToast={showToast}
+        />
+      )}
 
       {flowOpen && <Flow onClose={() => setFlowOpen(false)} onGenerate={runGenerate} />}
 

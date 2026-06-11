@@ -78,6 +78,7 @@ export interface ContentPiece {
   userImage?: boolean;
   textOverlays?: TextOverlay[];
   textPositions?: Record<string, { x: number; y: number }>;
+  postedAt?: number;       // unix ms when the post was sent to Zapier
 }
 
 export interface ChatMessage {

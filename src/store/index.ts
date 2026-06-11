@@ -12,7 +12,7 @@ export interface Webhooks {
 interface AppStore {
   projects: ContentPiece[];
   current: ContentPiece | null;
-  view: 'home' | 'studio';
+  view: 'home' | 'studio' | 'calendar';
   flowOpen: boolean;
   generating: boolean;
   toast: string | null;
@@ -20,7 +20,8 @@ interface AppStore {
 
   setProjects: (projects: ContentPiece[]) => void;
   setCurrent: (p: ContentPiece | null) => void;
-  setView: (v: 'home' | 'studio') => void;
+  setView: (v: 'home' | 'studio' | 'calendar') => void;
+  updateProject: (p: ContentPiece) => void;
   setFlowOpen: (v: boolean) => void;
   setGenerating: (v: boolean) => void;
   setToast: (msg: string | null) => void;
@@ -53,6 +54,10 @@ export const useStore = create<AppStore>()(
       updateCurrent: (p) => set(state => ({
         current: p,
         projects: state.projects.map(x => x.id === p.id ? p : x),
+      })),
+      updateProject: (p) => set(state => ({
+        projects: state.projects.map(x => x.id === p.id ? p : x),
+        current: state.current?.id === p.id ? p : state.current,
       })),
       addProject: (p) => set(state => ({
         projects: [p, ...state.projects],

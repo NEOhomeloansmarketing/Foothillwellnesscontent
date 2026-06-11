@@ -211,20 +211,6 @@ function AIImagePanel({ service, audience, onGenerated, onClose }: {
 }
 
 // ─── Canvas 2D text helper ─────────────────────────────────────────────────────
-function wrapText(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, maxW: number, lh: number, maxLines = 4): number {
-  const words = (text || '').split(' ');
-  let line = '', curY = y, count = 0;
-  for (const word of words) {
-    if (count >= maxLines) break;
-    const test = line ? line + ' ' + word : word;
-    if (ctx.measureText(test).width > maxW && line) {
-      ctx.fillText(line, x, curY); curY += lh; count++; line = word;
-    } else { line = test; }
-  }
-  if (line && count < maxLines) { ctx.fillText(line, x, curY); curY += lh; }
-  return curY;
-}
-
 // ─── Left panel: library + templates ───────────────────────────────────────────
 function LeftPanel({ projects, current, onSelect, onPick }: {
   projects: ContentPiece[]; current: ContentPiece | null;
@@ -305,10 +291,9 @@ interface CanvasProps {
   onUpdate: (p: ContentPiece) => void;
   onToast: (msg: string) => void;
   onSave: (p: ContentPiece) => void;
-  onExportImage: () => Promise<string | null>;
 }
 
-function CanvasPanel({ current, img, imgPos, onImgPos, onEditField, onUpdate, onToast, onSave, onExportImage }: CanvasProps) {
+function CanvasPanel({ current, img, imgPos, onImgPos, onEditField, onUpdate, onToast, onSave }: CanvasProps) {
   const [showCaption, setShowCaption] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [selectedOverlay, setSelectedOverlay] = useState<string | null>(null);
@@ -320,6 +305,27 @@ function CanvasPanel({ current, img, imgPos, onImgPos, onEditField, onUpdate, on
   const canvasAreaRef = useRef<HTMLDivElement>(null);
   const hasImg = !!img;
   const overlays: TextOverlay[] = current.textOverlays || [];
+
+  // Capture the live rendered canvas frame at 1080px — exact match to the preview
+  async function captureFrame(): Promise<string | null> {
+    const el = frameRef.current;
+    if (!el) return null;
+    try {
+      const { default: html2canvas } = await import('html2canvas');
+      const scale = 1080 / canvasSize;
+      const captured = await html2canvas(el, {
+        scale,
+        useCORS: true,
+        allowTaint: true,
+        logging: false,
+        backgroundColor: null,
+      });
+      return captured.toDataURL('image/png');
+    } catch (e) {
+      console.error('html2canvas capture failed:', e);
+      return null;
+    }
+  }
 
   // Responsive canvas size
   useEffect(() => {
@@ -431,8 +437,8 @@ function CanvasPanel({ current, img, imgPos, onImgPos, onEditField, onUpdate, on
             </button>
           )}
           <Btn variant="navy" icon="download" onClick={async () => {
-            onToast('Generating image…');
-            const dataUrl = await onExportImage();
+            onToast('Capturing image…');
+            const dataUrl = await captureFrame();
             if (!dataUrl) { onToast('Export failed — try again'); return; }
             const a = document.createElement('a');
             a.href = dataUrl;
@@ -608,7 +614,7 @@ function CanvasPanel({ current, img, imgPos, onImgPos, onEditField, onUpdate, on
       </div>
 
       {/* Publish bar */}
-      <PublishBar current={current} generateImage={onExportImage} onSave={onSave} onToast={onToast} />
+      <PublishBar current={current} generateImage={captureFrame} onSave={onSave} onToast={onToast} />
     </div>
   );
 }
@@ -649,7 +655,7 @@ function PublishBar({ current, generateImage, onSave, onToast }: {
       });
       const data = await res.json();
       if (!data.ok) throw new Error(data.error || `Zapier error ${data.status}`);
-      onSave({ ...current, channels: ['instagram', 'google'], status: 'posted' });
+      onSave({ ...current, channels: ['instagram', 'google'], status: 'posted', postedAt: Date.now() });
       onToast('Sent to Zapier ✓');
     } catch (e) {
       onToast(e instanceof Error ? e.message : 'Failed — try again');
@@ -964,107 +970,16 @@ export default function Studio({ projects, current, generating, onSelect, onUpda
   const webhooks = useStore(s => s.webhooks);
 
   useEffect(() => {
+    // When the project switches, always reset position
     setImg(current?.autoImage ?? null);
     setImgPos({ x: 50, y: 35 });
     setChans(current?.channels?.length ? current.channels as ChannelId[] : ['instagram']);
   }, [current?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  async function generatePostImage(): Promise<string | null> {
-    if (!current) return null;
-    const firstImg = Array.isArray(img) ? img[0] : img;
-    const g = current.graphic;
-    const canvas = document.createElement('canvas');
-    canvas.width = 1080; canvas.height = 1080;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return null;
-    const c = ctx; // capture as non-null for use inside nested functions
-
-    // roundRect polyfill for browsers without native support (pre-Chrome 99 / Safari 15.4)
-    function rr(x: number, y: number, w: number, h: number, r: number) {
-      c.beginPath();
-      c.moveTo(x + r, y);
-      c.lineTo(x + w - r, y);
-      c.arcTo(x + w, y, x + w, y + r, r);
-      c.lineTo(x + w, y + h - r);
-      c.arcTo(x + w, y + h, x + w - r, y + h, r);
-      c.lineTo(x + r, y + h);
-      c.arcTo(x, y + h, x, y + h - r, r);
-      c.lineTo(x, y + r);
-      c.arcTo(x, y, x + r, y, r);
-      c.closePath();
-    }
-
-    // Wait for fonts — 2 s max so a slow CDN never blocks us
-    await Promise.race([document.fonts.ready, new Promise(r => setTimeout(r, 2000))]);
-
-    // Background
-    ctx.fillStyle = '#011836';
-    ctx.fillRect(0, 0, 1080, 1080);
-
-    // Photo — 4 s max in case the data URL is huge
-    if (firstImg) {
-      await Promise.race([
-        new Promise<void>(res => {
-          const photo = new Image();
-          photo.onload = () => {
-            const ar = photo.naturalWidth / photo.naturalHeight;
-            let sx = 0, sy = 0, sw = photo.naturalWidth, sh = photo.naturalHeight;
-            if (ar > 1) { sw = sh; sx = (photo.naturalWidth - sw) / 2; }
-            else { sh = sw; sy = (photo.naturalHeight - sh) / 2; }
-            ctx.drawImage(photo, sx, sy, sw, sh, 0, 0, 1080, 1080);
-            res();
-          };
-          photo.onerror = () => res();
-          photo.src = firstImg;
-        }),
-        new Promise<void>(r => setTimeout(r, 4000)),
-      ]);
-    }
-
-    // Gradient
-    const grad = ctx.createLinearGradient(0, 0, 0, 1080);
-    grad.addColorStop(0, 'rgba(1,24,54,.72)'); grad.addColorStop(.35, 'rgba(1,24,54,.05)');
-    grad.addColorStop(.5, 'rgba(1,24,54,0)'); grad.addColorStop(.68, 'rgba(1,24,54,.55)');
-    grad.addColorStop(1, 'rgba(1,24,54,.98)');
-    ctx.fillStyle = grad; ctx.fillRect(0, 0, 1080, 1080);
-
-    // Logo pill
-    ctx.fillStyle = 'rgba(1,24,54,.84)';
-    rr(44, 40, 322, 58, 14); ctx.fill();
-    ctx.fillStyle = '#fff'; ctx.font = 'bold 20px "Playfair Display",serif';
-    ctx.textBaseline = 'middle'; ctx.fillText('FOOTHILL WELLNESS', 64, 69);
-
-    // Eyebrow
-    if (g.eyebrow) {
-      ctx.fillStyle = '#D1BB74'; ctx.font = 'bold 16px Inter,sans-serif';
-      ctx.textAlign = 'right'; ctx.fillText(g.eyebrow.toUpperCase(), 1036, 69); ctx.textAlign = 'left';
-    }
-    ctx.textBaseline = 'alphabetic';
-
-    // Gold bar
-    ctx.fillStyle = '#D1BB74'; rr(56, 712, 60, 3, 2); ctx.fill();
-
-    // Hook
-    const hook = g.hook || '';
-    const hSize = hook.length > 50 ? 62 : hook.length > 30 ? 76 : 90;
-    ctx.fillStyle = '#fff'; ctx.font = `bold ${hSize}px "Playfair Display",serif`;
-    const hookEnd = wrapText(ctx, hook, 56, 772, 970, hSize, 3);
-
-    // Subhook
-    ctx.fillStyle = 'rgba(255,255,255,.82)'; ctx.font = '300 26px Inter,sans-serif';
-    const subEnd = wrapText(ctx, g.subhook || '', 56, hookEnd + 16, 740, 38, 2);
-
-    // CTA pill
-    const ctaY = Math.min(subEnd + 22, 978);
-    ctx.fillStyle = '#D1BB74'; rr(56, ctaY, 470, 62, 31); ctx.fill();
-    ctx.fillStyle = '#011836'; ctx.font = 'bold 24px Inter,sans-serif'; ctx.textBaseline = 'middle';
-    ctx.fillText('Call or text  (801) 784-0095', 88, ctaY + 31);
-
-    // Footer stripe
-    ctx.fillStyle = '#C9A84C'; ctx.fillRect(0, 1074, 1080, 6);
-
-    return canvas.toDataURL('image/png');
-  }
+  // When the background DALL-E image arrives on the SAME project, load it without resetting position
+  useEffect(() => {
+    if (current?.autoImage && !img) setImg(current.autoImage);
+  }, [current?.autoImage]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function editField(field: string, val: string) {
     if (!current) return;
@@ -1108,12 +1023,6 @@ export default function Studio({ projects, current, generating, onSelect, onUpda
 
   return (
     <div className="ed-layout">
-      {/* Export canvas — parked just above viewport so browser keeps it painted */}
-      <div id="export-wrapper" style={{ position: 'fixed', top: -1082, left: 0, pointerEvents: 'none', zIndex: -1 }}>
-        <div id="export-canvas" style={{ width: 1080, height: 1080, position: 'relative' }}>
-          <GraphicCanvas tpl={current.template} content={current.graphic} img={img} imgPos={imgPos} />
-        </div>
-      </div>
       <input ref={fileRef} type="file" accept="image/*" hidden onChange={onFile} />
 
       <LeftPanel
@@ -1123,7 +1032,6 @@ export default function Studio({ projects, current, generating, onSelect, onUpda
       <CanvasPanel
         current={current} img={img} imgPos={imgPos} onImgPos={setImgPos}
         onEditField={editField} onUpdate={onUpdate} onToast={onToast} onSave={onSave}
-        onExportImage={generatePostImage}
       />
 
       <RightPanel
