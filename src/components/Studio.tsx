@@ -462,21 +462,23 @@ function CanvasPanel({ current, img, imgPos, onImgPos, onEditField, onUpdate, on
           onMouseDown={onMouseDown}
           onClick={e => e.stopPropagation()}
         >
-          {/* Graphic — graphicRef points at the full 1080×1080 render for export */}
-          <div ref={graphicRef} style={{ width: 1080, height: 1080, transform: `scale(${scale})`, transformOrigin: 'top left', position: 'absolute', top: 0, left: 0 }}>
-            <GraphicCanvas
-              tpl={current.template} content={g} img={img} imgPos={imgPos}
-              edit={{
-                on: true,
-                set: onEditField,
-                positions: current.textPositions,
-                onDragStart: (field, e) => {
-                  e.stopPropagation();
-                  const pos = current.textPositions?.[field] || { x: 0, y: 0 };
-                  fieldDragStart.current = { field, x: e.clientX, y: e.clientY, ox: pos.x, oy: pos.y };
-                },
-              }}
-            />
+          {/* graphicRef wraps the unscaled 1080×1080 content — the parent transform must NOT be on this element */}
+          <div style={{ width: 1080, height: 1080, transform: `scale(${scale})`, transformOrigin: 'top left', position: 'absolute', top: 0, left: 0 }}>
+            <div ref={graphicRef} style={{ width: 1080, height: 1080, position: 'relative' }}>
+              <GraphicCanvas
+                tpl={current.template} content={g} img={img} imgPos={imgPos}
+                edit={{
+                  on: true,
+                  set: onEditField,
+                  positions: current.textPositions,
+                  onDragStart: (field, e) => {
+                    e.stopPropagation();
+                    const pos = current.textPositions?.[field] || { x: 0, y: 0 };
+                    fieldDragStart.current = { field, x: e.clientX, y: e.clientY, ox: pos.x, oy: pos.y };
+                  },
+                }}
+              />
+            </div>
           </div>
 
           {/* Text overlays */}
