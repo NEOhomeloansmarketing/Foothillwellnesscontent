@@ -311,24 +311,28 @@ function CanvasPanel({ current, img, imgPos, onImgPos, onEditField, onUpdate, on
 
   // Capture the actual rendered graphic (whichever template is on screen) via html-to-image.
   // skipFonts avoids hanging on Google Fonts CDN fetches.
-  async function captureFrame(): Promise<string | null> {
+  async function captureFrame(): Promise<string> {
     const node = graphicRef.current;
-    if (!node) return null;
-    try {
-      const { toJpeg } = await import('html-to-image');
-      const dataUrl = await toJpeg(node, {
+    if (!node) throw new Error('Graphic not ready — try again');
+    const { toJpeg } = await import('html-to-image');
+    // Race against a 20s timeout so we never hang silently
+    const timeout = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Export timed out — refresh and try again')), 20000)
+    );
+    const dataUrl = await Promise.race([
+      toJpeg(node, {
         quality: 0.92,
         width: 1080,
         height: 1080,
         skipFonts: true,
         pixelRatio: 1,
         cacheBust: true,
-      });
-      return dataUrl;
-    } catch (e) {
-      console.error('captureFrame error:', e);
-      return null;
-    }
+        fetchRequestInit: { cache: 'no-cache' },
+      }),
+      timeout,
+    ]);
+    if (!dataUrl || dataUrl.length < 1000) throw new Error('Export produced an empty image — try again');
+    return dataUrl;
   }
 
   // Responsive canvas size
@@ -442,13 +446,14 @@ function CanvasPanel({ current, img, imgPos, onImgPos, onEditField, onUpdate, on
           )}
           <Btn variant="navy" icon="download" onClick={async () => {
             onToast('Capturing image…');
+            try {
             const dataUrl = await captureFrame();
-            if (!dataUrl) { onToast('Export failed — try again'); return; }
             const a = document.createElement('a');
             a.href = dataUrl;
             a.download = 'foothill-post.png';
             a.click();
             onToast('Downloaded!');
+            } catch (e) { onToast(e instanceof Error ? e.message : 'Export failed — try again'); }
           }}>Export PNG</Btn>
         </div>
       </div>
@@ -647,7 +652,6 @@ function PublishBar({ current, captureFrame, onSave, onToast, webhookUrl, onWebh
     try {
       // Step 1: render the canvas graphic
       const dataUrl = await captureFrame();
-      if (!dataUrl) throw new Error('Could not export the graphic. Try again.');
 
       // Step 2: upload to get a public URL
       setStage('uploading');
