@@ -5,6 +5,7 @@ import Social from './ui/Social';
 import Btn from './ui/Btn';
 import GraphicCanvas, { TEMPLATES } from './graphic/GraphicCanvas';
 import ReviewPicker from './ReviewPicker';
+import SocialPreview from './SocialPreview';
 import { AUD } from '@/lib/content';
 import { useStore } from '@/store';
 import type { ContentPiece, ChannelId, ChatMessage, FiveLaw, TextOverlay } from '@/types';
@@ -702,73 +703,91 @@ function CanvasPanel({ current, img, imgPos, onImgPos, onEditField, onUpdate, on
       </div>
 
       {/* Publish bar */}
-      <PublishBar current={current} img={img} onSave={onSave} onToast={onToast} />
+      <PublishBar current={current} captureFrame={captureFrame} onSave={onSave} onToast={onToast} />
     </div>
   );
 }
 
 // ─── Publish bar ─────────────────────────────────────────────────────────────
-const ZAPIER_WEBHOOK = 'https://hooks.zapier.com/hooks/catch/14659614/43606p9/';
-
-function PublishBar({ current, img, onSave, onToast }: {
+function PublishBar({ current, captureFrame, onSave, onToast }: {
   current: ContentPiece;
-  img: string | string[] | null;
+  captureFrame: () => Promise<string | null>;
   onSave: (p: ContentPiece) => void;
   onToast: (msg: string) => void;
 }) {
-  const [posting, setPosting] = useState(false);
+  const [stage, setStage] = useState<'idle' | 'capturing' | 'uploading' | 'preview'>('idle');
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  async function handlePost() {
-    setPosting(true);
-    onToast('Sending to Instagram…');
+  async function handlePrepare() {
+    setStage('capturing');
+    setError(null);
     try {
-      // Use the DALL-E image stored in state — no canvas capture needed
-      const imgSrc = Array.isArray(img) ? img[0] : img;
-      const imageBase64 = imgSrc || (Array.isArray(current.autoImage) ? current.autoImage[0] : current.autoImage) || null;
+      // Step 1: render the canvas graphic
+      const dataUrl = await captureFrame();
+      if (!dataUrl) throw new Error('Could not export the graphic. Try again.');
 
-      const res = await fetch('/api/webhook', {
+      // Step 2: upload to get a public URL
+      setStage('uploading');
+      const res = await fetch('/api/upload', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          webhookUrl: ZAPIER_WEBHOOK,
-          payload: {
-            caption: current.caption,
-            hashtags: current.hashtags.join(' '),
-            fullCaption: current.caption + '\n\n' + current.hashtags.join(' '),
-            imageBase64,
-            service: current.service,
-            timestamp: new Date().toISOString(),
-          },
-        }),
+        body: JSON.stringify({ dataUrl }),
       });
       const data = await res.json();
-      if (data.imgbbError) throw new Error(data.imgbbError);
-      if (!data.ok) throw new Error(data.error || `Zapier returned ${data.status}: ${data.body}`);
-      onSave({ ...current, channels: ['instagram', 'google'], status: 'posted', postedAt: Date.now() });
-      onToast('Sent to Instagram ✓');
+      if (!data.ok) throw new Error(data.error || 'Image upload failed');
+
+      setImageUrl(data.url);
+      setStage('preview');
     } catch (e) {
-      onToast(e instanceof Error ? e.message : 'Failed — try again');
-    } finally {
-      setPosting(false);
+      setError(e instanceof Error ? e.message : 'Something went wrong');
+      setStage('idle');
+      onToast(e instanceof Error ? e.message : 'Something went wrong');
     }
   }
 
+  const busy = stage === 'capturing' || stage === 'uploading';
+  const label = stage === 'capturing' ? 'Exporting graphic…' : stage === 'uploading' ? 'Uploading image…' : 'Post to Social';
+
   return (
-    <div className="ed-publish" style={{ padding: '14px 20px' }}>
-      <button
-        onClick={handlePost}
-        disabled={posting}
-        style={{
-          width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
-          padding: '14px', borderRadius: 12, border: 'none', fontWeight: 700, fontSize: 14,
-          letterSpacing: '.04em', cursor: posting ? 'not-allowed' : 'pointer', transition: '.15s',
-          background: posting ? 'var(--line-soft)' : 'var(--navy-deep)',
-          color: posting ? 'var(--muted)' : 'var(--gold-cta)',
-        }}>
-        <Icon n={posting ? 'refresh' : 'send'} size={16} />
-        {posting ? 'Sending…' : 'Post to Social'}
-      </button>
-    </div>
+    <>
+      <div className="ed-publish" style={{ padding: '14px 20px' }}>
+        {error && (
+          <div style={{ fontSize: 11.5, color: '#dc2626', marginBottom: 8, background: '#fef2f2', borderRadius: 8, padding: '7px 10px', lineHeight: 1.4 }}>
+            {error}
+          </div>
+        )}
+        <button
+          onClick={handlePrepare}
+          disabled={busy}
+          style={{
+            width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+            padding: '14px', borderRadius: 12, border: 'none', fontWeight: 700, fontSize: 14,
+            letterSpacing: '.04em', cursor: busy ? 'not-allowed' : 'pointer', transition: '.15s',
+            background: busy ? 'var(--line-soft)' : 'var(--navy-deep)',
+            color: busy ? 'var(--muted)' : 'var(--gold-cta)',
+          }}>
+          <Icon n={busy ? 'refresh' : 'send'} size={16} />
+          {label}
+        </button>
+      </div>
+
+      {stage === 'preview' && imageUrl && (
+        <SocialPreview
+          imageUrl={imageUrl}
+          caption={current.caption}
+          hashtags={current.hashtags}
+          service={current.service}
+          onClose={() => { setStage('idle'); setImageUrl(null); }}
+          onPosted={() => {
+            setStage('idle');
+            setImageUrl(null);
+            onSave({ ...current, channels: ['instagram', 'google'], status: 'posted', postedAt: Date.now() });
+            onToast('Posted to Instagram ✓');
+          }}
+        />
+      )}
+    </>
   );
 }
 
