@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { AUD } from '@/lib/content';
-import { fiveLaws } from '@/lib/brand';
 import { getReviewsForService } from '@/lib/testimonials';
 import type { AudienceId } from '@/types';
 
@@ -10,84 +9,112 @@ const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 export async function POST(req: NextRequest) {
   const { service, audience, goal, notes, usedHooks = [], proofUsed } = await req.json();
 
-  // Get service-specific reviews (falls back to generic if no match)
   const reviews = getReviewsForService(service);
-
-  // Pin to the specific review already on the graphic (if provided), otherwise pick first match
   const pinned = (proofUsed ? reviews.find(r => r.name === proofUsed) : null) ?? reviews[0];
 
-  const proofBlock = pinned
-    ? `USE THIS EXACT CLIENT REVIEW VERBATIM in the caption — copy word-for-word, do not paraphrase:\n"${pinned.text}" — ${pinned.name}`
-    : '';
+  const audienceLabel = AUD[audience as AudienceId] ?? audience;
 
-  const lawsBlock = fiveLaws.map(l => `  Law ${l.n}: ${l.name} — ${l.test}`).join('\n');
+  const prompt = `You are the strategic social media content director and direct-response marketing strategist for Foothill Wellness — a premium wellness center in Salt Lake City, UT.
 
-  const prompt = `You are writing Instagram content for Foothill Wellness (Salt Lake City, UT).
+Your role: produce high-performing Instagram content that is emotionally resonant, outcome-first, and aligned with the Five Laws of Marketing framework. You are not a copywriter who fills templates — you are a strategic partner who understands customer psychology deeply.
 
-CRITICAL RULE — READ THIS FIRST:
-The VERY FIRST WORD of the hook must be a problem, pain, or "you/your" statement. NEVER start with the service name, "At Foothill", "Foothill Wellness", "We", "Our", or any business name.
+═══════════════════════════════════════
+FIVE LAWS OF MARKETING — THE ONLY FILTER THAT MATTERS
+These are NON-NEGOTIABLE. Every word must pass all five simultaneously.
+═══════════════════════════════════════
 
-❌ WRONG hooks (automatic fail):
-- "Cryotherapy can help you recover faster"
-- "Infrared Sauna sessions at Foothill Wellness..."
-- "At Foothill Wellness, we offer..."
-- "Red Light Therapy is amazing for..."
+LAW 1 — IT IS NOT ABOUT US.
+The customer is the HERO. Foothill Wellness is the trusted GUIDE.
+✅ "You've been fighting this for months. Here's what actually works."
+❌ "At Foothill Wellness, we offer...", "We believe...", "Our team..."
+Rule: Count your "you/your" vs "we/our" — you/your must win 3:1 or more.
 
-✅ CORRECT hooks (start with the customer's reality):
-- "Still sore days after your workout?"
-- "Struggling to sleep no matter what you try?"
-- "Tired of feeling wiped out by 2pm every day?"
-- "Can't shake that brain fog no matter what you do?"
+LAW 2 — LEAD WITH THEIR PROBLEM.
+The hook and the FIRST SENTENCE of the caption must name the exact frustration, pain, fear, or desire the ${audienceLabel} audience feels RIGHT NOW — before you ever name ${service}.
+✅ "Still waking up exhausted no matter how much sleep you get?"
+✅ "Tired of being sore for days after every workout?"
+✅ "You've tried everything. Nothing's working. And you're over it."
+❌ "${service} can help you feel better"
+❌ "Introducing ${service} at Foothill Wellness"
+❌ Starting with ANY service name, feature, or business reference
 
-THE FIVE LAWS — every piece must pass ALL FIVE:
+LAW 3 — INCREASE PERCEIVED LIKELIHOOD OF SUCCESS.
+Make the customer believe improvement is genuinely possible for THEM.
+Include one of: specific client outcome, mechanism of action, verbatim testimonial, or statistic.
+✅ The required testimonial below counts toward this — use it.
+❌ Vague hope: "feel your best", "wellness journey", "transform your life"
 
-LAW 1 — NOT about us. Customer is HERO, we are the guide.
-Use "you/your" at least 3x more than "we/our". Never open with the business.
+LAW 4 — INCREASE PERCEIVED SPEED.
+The result must feel faster than they expect.
+✅ "in as little as one session", "within 48 hours", "same-day relief", "just 30 minutes"
+❌ Any copy that makes results feel distant, gradual, or uncertain
 
-LAW 2 — LEAD WITH THEIR PROBLEM. The hook and first sentence of the caption must name the exact frustration the ${AUD[audience as AudienceId]} audience feels RIGHT NOW — before you ever mention ${service}.
+LAW 5 — INCREASE PERCEIVED EASE.
+The first step must feel completely frictionless.
+✅ "one call or text", "no prescription needed", "just show up", "we handle everything"
+❌ Any process that sounds complicated, clinical, or high-commitment
 
-LAW 3 — BUILD BELIEF. Include one specific result, mechanism, or the verbatim testimonial below to prove it works.
+═══════════════════════════════════════
+MANDATORY INTERNAL WORKFLOW (do this before writing)
+═══════════════════════════════════════
+Before writing a single word, internally identify:
+1. What is the exact frustration ${audienceLabel} people feel RIGHT NOW about ${service}?
+2. What is the dream outcome they desperately want?
+3. What emotional pain sits underneath that frustration?
+4. Why should they believe ${service} will actually work for them?
+5. How can you make the result feel faster and easier than expected?
+6. What is the single clearest next step?
 
-LAW 4 — SPEED. Use time language: "in as little as one session", "within days", "same-day relief", "30 minutes".
+═══════════════════════════════════════
+BRAND VOICE
+═══════════════════════════════════════
+Core positioning:
+- "Feel Better Faster."
+- "Your body already knows how to heal itself. We help it heal faster."
+- "They are not trying to become someone new. They are trying to get themselves back."
 
-LAW 5 — EASE. Make the first step feel effortless: "one call", "no prescription needed", "just 30 minutes of your day".
+Tone: Modern, warm, conversational, emotionally intelligent, confident without being pushy.
+Premium but human. Expert but not clinical. Encouraging but not hypey.
+Never: miracle claims, fear manipulation, disease-treatment claims, guaranteed results.
+Always use: "may help", "can support", "many clients report"
 
-═══════════════════════════
-ASSIGNMENT
-═══════════════════════════
+═══════════════════════════════════════
+CONTENT ASSIGNMENT
+═══════════════════════════════════════
 Service: ${service}
-Audience: ${AUD[audience as AudienceId]}
-Goal: ${goal}
-${notes ? `Notes: ${notes}` : ''}
-Do NOT reuse these hooks: ${usedHooks.join(' | ') || 'none'}
+Target audience: ${audienceLabel}
+Content goal: ${goal}
+${notes ? `Team notes: ${notes}` : ''}
+Previously used hooks (do NOT reuse): ${usedHooks.join(' | ') || 'none'}
 
-Caption structure (in order): Problem → Empathy → Guide → Plan → Proof (testimonial) → Speed → Ease → CTA
-Final line of caption must be: "📞 Call or text (801) 784-0095 · Foothill Wellness, Salt Lake City"
+MANDATORY CAPTION SEQUENCE: Problem → Empathy → Guide → Plan → Proof → Speed → Ease → Action
+Final line must be exactly: "📞 Call or text (801) 784-0095 · Foothill Wellness, Salt Lake City"
 
-Use "may help", "can support", "many clients report" — never guarantee results. No disease claims.
+═══════════════════════════════════════
+REQUIRED TESTIMONIAL — COPY VERBATIM, WORD FOR WORD
+═══════════════════════════════════════
+${pinned ? `Place this exact client quote in the Proof section. Do NOT paraphrase. Do NOT shorten. Copy every word:
 
-═══════════════════════════
-REQUIRED CLIENT REVIEW — COPY WORD FOR WORD
-═══════════════════════════
-Place this exact quote verbatim in the Proof section of the caption. Do not paraphrase:
+"${pinned.text}" — ${pinned.name}` : 'No testimonial available — write proof using a specific outcome or mechanism instead.'}
 
-"${pinned?.text}" — ${pinned?.name}
+═══════════════════════════════════════
+SELF-CHECK BEFORE OUTPUTTING (rewrite if any fail)
+═══════════════════════════════════════
+[ ] Hook opens with customer's problem, pain, or "you" — NOT the service name or business name
+[ ] First sentence of caption names the frustration before mentioning ${service}
+[ ] Caption says "you/your" at least 3x more than "we/our"
+[ ] Testimonial is copied exactly as provided (not paraphrased)
+[ ] Caption includes at least one speed signal (time phrase)
+[ ] Caption makes the first step feel easy and frictionless
+[ ] Caption ends with the required phone CTA
 
-═══════════════════════════
-SELF-CHECK (before outputting JSON)
-═══════════════════════════
-Does the hook start with the customer's PROBLEM or "you"? (not the service name) → if no, rewrite
-Does the caption open with the customer's pain before mentioning ${service}? → if no, rewrite
-Is the testimonial quote copied exactly? → if no, fix it
-Does the caption mention speed AND ease? → if no, add them
-
-Return ONLY valid minified JSON, no markdown, no explanation:
-{"hook":"≤65 chars — MUST start with customer problem or 'you', e.g. 'Still sore days later? Your body needs this.'","emphasis":"1-3 word bold phrase from hook","subhook":"one warm sentence bridging the problem to ${service} as the solution — use 'you'","caption":"full IG caption: Problem→Empathy→Guide→Plan→Proof(verbatim quote)→Speed→Ease→CTA. End with: 📞 Call or text (801) 784-0095 · Foothill Wellness, Salt Lake City","hashtags":["8 relevant hashtags with #"]}`;
+Return ONLY valid minified JSON — no markdown, no explanation, no code fences:
+{"hook":"≤65 chars — opens with customer problem or 'you', makes ${service} feel like the obvious answer without naming it first","emphasis":"1-3 word phrase from the hook to bold/highlight in gold on the graphic","subhook":"one warm sentence that bridges from their problem directly to ${service} as the solution — use 'you'","caption":"full Instagram caption following Problem→Empathy→Guide→Plan→Proof(verbatim quote)→Speed→Ease→Action. End with: 📞 Call or text (801) 784-0095 · Foothill Wellness, Salt Lake City","hashtags":["8 relevant hashtags with #"]}`;
 
   try {
     const message = await client.messages.create({
       model: 'claude-sonnet-4-6',
-      max_tokens: 1800,
+      max_tokens: 2000,
       messages: [{ role: 'user', content: prompt }],
     });
     const raw = (message.content[0] as { text: string }).text;
