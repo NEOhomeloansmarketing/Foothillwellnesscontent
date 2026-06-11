@@ -301,6 +301,7 @@ function CanvasPanel({ current, img, imgPos, onImgPos, onEditField, onUpdate, on
   const [canvasSize, setCanvasSize] = useState(460);
   const dragStart = useRef<{ x: number; y: number; px: number; py: number } | null>(null);
   const overlayDragStart = useRef<{ x: number; y: number; ox: number; oy: number; id: string } | null>(null);
+  const fieldDragStart = useRef<{ field: string; x: number; y: number; ox: number; oy: number } | null>(null);
   const frameRef = useRef<HTMLDivElement>(null);
   const canvasAreaRef = useRef<HTMLDivElement>(null);
   const hasImg = !!img;
@@ -329,6 +330,15 @@ function CanvasPanel({ current, img, imgPos, onImgPos, onEditField, onUpdate, on
   }
 
   const onMouseMove = useCallback((e: MouseEvent) => {
+    if (fieldDragStart.current) {
+      const fd = fieldDragStart.current;
+      const scale = canvasSize / 1080;
+      const dx = (e.clientX - fd.x) / scale;
+      const dy = (e.clientY - fd.y) / scale;
+      const textPositions = { ...(current.textPositions || {}), [fd.field]: { x: Math.round(fd.ox + dx), y: Math.round(fd.oy + dy) } };
+      onUpdate({ ...current, textPositions });
+      return;
+    }
     if (overlayDragStart.current) {
       const od = overlayDragStart.current;
       const scale = canvasSize / 1080;
@@ -352,6 +362,7 @@ function CanvasPanel({ current, img, imgPos, onImgPos, onEditField, onUpdate, on
     setIsDragging(false);
     dragStart.current = null;
     overlayDragStart.current = null;
+    fieldDragStart.current = null;
   }, []);
 
   useEffect(() => {
@@ -400,6 +411,11 @@ function CanvasPanel({ current, img, imgPos, onImgPos, onEditField, onUpdate, on
           <button onClick={addTextBox} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 700, color: 'var(--gold-muted)', background: 'var(--cream)', border: '1.5px solid var(--gold)', borderRadius: 8, padding: '6px 12px', cursor: 'pointer' }}>
             <Icon n="plus" size={13} /> Add Text
           </button>
+          {current.textPositions && Object.keys(current.textPositions).length > 0 && (
+            <button onClick={() => onUpdate({ ...current, textPositions: {} })} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600, color: 'var(--muted)', background: 'var(--cream)', border: '1px solid var(--line)', borderRadius: 8, padding: '6px 10px', cursor: 'pointer' }} title="Reset all text positions to default">
+              <Icon n="refresh" size={12} /> Reset Layout
+            </button>
+          )}
           <Btn variant="navy" icon="download" onClick={onExport}>Export PNG</Btn>
         </div>
       </div>
@@ -415,7 +431,19 @@ function CanvasPanel({ current, img, imgPos, onImgPos, onEditField, onUpdate, on
         >
           {/* Graphic */}
           <div style={{ width: 1080, height: 1080, transform: `scale(${scale})`, transformOrigin: 'top left', position: 'absolute', top: 0, left: 0 }}>
-            <GraphicCanvas tpl={current.template} content={g} img={img} imgPos={imgPos} edit={{ on: true, set: onEditField }} />
+            <GraphicCanvas
+              tpl={current.template} content={g} img={img} imgPos={imgPos}
+              edit={{
+                on: true,
+                set: onEditField,
+                positions: current.textPositions,
+                onDragStart: (field, e) => {
+                  e.stopPropagation();
+                  const pos = current.textPositions?.[field] || { x: 0, y: 0 };
+                  fieldDragStart.current = { field, x: e.clientX, y: e.clientY, ox: pos.x, oy: pos.y };
+                },
+              }}
+            />
           </div>
 
           {/* Text overlays */}
@@ -496,7 +524,7 @@ function CanvasPanel({ current, img, imgPos, onImgPos, onEditField, onUpdate, on
         )}
 
         {!sel && <div style={{ fontSize: 11, color: 'var(--muted)', textAlign: 'center' }}>
-          <Icon n="edit" size={12} /> <b style={{ color: 'var(--navy-mid)' }}>Click any text</b> to edit · <b style={{ color: 'var(--navy-mid)' }}>Add Text</b> to add a custom box
+          <Icon n="edit" size={12} /> <b style={{ color: 'var(--navy-mid)' }}>Click any text</b> to edit · <b style={{ color: 'var(--navy-mid)' }}>Hover text</b> to drag it · <b style={{ color: 'var(--navy-mid)' }}>Add Text</b> for a new box
         </div>}
       </div>
 

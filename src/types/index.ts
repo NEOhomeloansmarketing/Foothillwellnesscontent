@@ -77,6 +77,7 @@ export interface ContentPiece {
   status: StatusType;
   userImage?: boolean;
   textOverlays?: TextOverlay[];
+  textPositions?: Record<string, { x: number; y: number }>;
 }
 
 export interface ChatMessage {

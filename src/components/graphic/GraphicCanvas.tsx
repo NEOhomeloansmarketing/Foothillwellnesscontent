@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { GraphicContent, TemplateId } from '@/types';
 import Icon from '@/components/ui/Icon';
 
@@ -33,12 +33,23 @@ function Stars({ size = 26 }: { size?: number }) {
   return <div style={{ display: 'flex', gap: 4 }}>{[1,2,3,4,5].map(n => <span key={n} style={{ color: C.gold, fontSize: size }}>★</span>)}</div>;
 }
 
-interface EH { on: boolean; set: (f: string, v: string) => void; }
+interface EH {
+  on: boolean;
+  set: (f: string, v: string) => void;
+  positions?: Record<string, { x: number; y: number }>;
+  onDragStart?: (field: string, e: React.MouseEvent) => void;
+}
 
 function Ed({ e, f, tag = 'div', multi, s, children }: {
   e?: EH; f: string; tag?: 'div'|'h1'|'h2'|'p'|'blockquote'|'span';
   multi?: boolean; s?: React.CSSProperties; children?: React.ReactNode;
 }) {
+  const [hov, setHov] = useState(false);
+  const dragRef = useRef(false);
+
+  const pos = e?.positions?.[f];
+  const hasDrag = e?.on && !!e?.onDragStart;
+
   const shared = {
     className: e?.on ? 'ged' : undefined,
     contentEditable: e?.on || undefined,
@@ -47,12 +58,41 @@ function Ed({ e, f, tag = 'div', multi, s, children }: {
     onKeyDown: e?.on && !multi ? (ev: React.KeyboardEvent) => { if (ev.key === 'Enter') { ev.preventDefault(); (ev.currentTarget as HTMLElement).blur(); } } : undefined,
     style: s,
   };
-  if (tag === 'h1') return <h1 {...shared}>{children}</h1>;
-  if (tag === 'h2') return <h2 {...shared}>{children}</h2>;
-  if (tag === 'p') return <p {...shared}>{children}</p>;
-  if (tag === 'blockquote') return <blockquote {...shared}>{children}</blockquote>;
-  if (tag === 'span') return <span {...shared}>{children}</span>;
-  return <div {...shared}>{children}</div>;
+
+  let el: React.ReactNode;
+  if (tag === 'h1') el = <h1 {...shared}>{children}</h1>;
+  else if (tag === 'h2') el = <h2 {...shared}>{children}</h2>;
+  else if (tag === 'p') el = <p {...shared}>{children}</p>;
+  else if (tag === 'blockquote') el = <blockquote {...shared}>{children}</blockquote>;
+  else if (tag === 'span') el = <span {...shared}>{children}</span>;
+  else el = <div {...shared}>{children}</div>;
+
+  if (!hasDrag) return el;
+
+  return (
+    <div
+      style={{ position: 'relative', ...(pos ? { transform: `translate(${pos.x}px, ${pos.y}px)` } : {}) }}
+      onMouseEnter={() => setHov(true)}
+      onMouseLeave={() => { setHov(false); dragRef.current = false; }}
+    >
+      {hov && (
+        <div
+          onMouseDown={ev => { ev.stopPropagation(); dragRef.current = true; e!.onDragStart!(f, ev); }}
+          style={{
+            position: 'absolute', top: -22, left: 0, zIndex: 20,
+            background: 'rgba(1,24,54,.88)', color: '#D1BB74',
+            borderRadius: 5, padding: '2px 8px', fontSize: 10, fontWeight: 700,
+            cursor: 'grab', display: 'flex', alignItems: 'center', gap: 5,
+            whiteSpace: 'nowrap', userSelect: 'none', letterSpacing: '.05em',
+            border: '1px solid rgba(201,168,76,.4)',
+          }}
+        >
+          <span style={{ fontSize: 12, lineHeight: 1 }}>⠿</span> {f}
+        </div>
+      )}
+      {el}
+    </div>
+  );
 }
 
 function hookParts(hook: string, em?: string) {
