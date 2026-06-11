@@ -971,92 +971,31 @@ export default function Studio({ projects, current, generating, onSelect, onUpda
 
   async function generatePostImage(): Promise<string | null> {
     if (!current) return null;
-    const firstImg = Array.isArray(img) ? img[0] : img;
-    const g = current.graphic;
-    const canvas = document.createElement('canvas');
-    canvas.width = 1080; canvas.height = 1080;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return null;
+    const wrapper = document.getElementById('export-wrapper');
+    const node = document.getElementById('export-canvas');
+    if (!wrapper || !node) return null;
 
-    await document.fonts.ready;
+    // Move into viewport so the browser has definitely painted it
+    wrapper.style.top = '0px';
+    wrapper.style.zIndex = '9999';
 
-    // Navy background
-    ctx.fillStyle = '#011836';
-    ctx.fillRect(0, 0, 1080, 1080);
+    // Two animation frames guarantees a paint cycle completed
+    await new Promise(r => requestAnimationFrame(r));
+    await new Promise(r => requestAnimationFrame(r));
 
-    // Photo (cover-fit)
-    if (firstImg) {
-      await new Promise<void>(res => {
-        const photo = new Image();
-        photo.onload = () => {
-          const ar = photo.naturalWidth / photo.naturalHeight;
-          let sx = 0, sy = 0, sw = photo.naturalWidth, sh = photo.naturalHeight;
-          if (ar > 1) { sw = sh; sx = (photo.naturalWidth - sw) / 2; }
-          else { sh = sw; sy = (photo.naturalHeight - sh) / 2; }
-          ctx.drawImage(photo, sx, sy, sw, sh, 0, 0, 1080, 1080);
-          res();
-        };
-        photo.onerror = () => res();
-        photo.src = firstImg;
+    try {
+      const { default: html2canvas } = await import('html2canvas');
+      const canvas = await html2canvas(node, {
+        width: 1080, height: 1080, scale: 1,
+        useCORS: true, allowTaint: true,
+        backgroundColor: '#011836', logging: false,
       });
+      return canvas.toDataURL('image/png');
+    } finally {
+      // Park it back above the viewport
+      wrapper.style.top = '-1082px';
+      wrapper.style.zIndex = '-1';
     }
-
-    // Gradient overlay
-    const grad = ctx.createLinearGradient(0, 0, 0, 1080);
-    grad.addColorStop(0, 'rgba(1,24,54,.72)');
-    grad.addColorStop(.35, 'rgba(1,24,54,.05)');
-    grad.addColorStop(.5, 'rgba(1,24,54,0)');
-    grad.addColorStop(.68, 'rgba(1,24,54,.55)');
-    grad.addColorStop(1, 'rgba(1,24,54,.98)');
-    ctx.fillStyle = grad; ctx.fillRect(0, 0, 1080, 1080);
-
-    // Logo pill (top left)
-    ctx.fillStyle = 'rgba(1,24,54,.84)';
-    ctx.beginPath(); ctx.roundRect(44, 40, 322, 58, 14); ctx.fill();
-    ctx.fillStyle = '#fff';
-    ctx.font = 'bold 20px "Playfair Display",serif';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('FOOTHILL WELLNESS', 64, 69);
-
-    // Eyebrow (top right)
-    if (g.eyebrow) {
-      ctx.fillStyle = '#D1BB74';
-      ctx.font = 'bold 16px Inter,sans-serif';
-      ctx.textAlign = 'right';
-      ctx.fillText((g.eyebrow).toUpperCase(), 1036, 69);
-      ctx.textAlign = 'left';
-    }
-    ctx.textBaseline = 'alphabetic';
-
-    // Gold divider bar
-    ctx.fillStyle = '#D1BB74';
-    ctx.beginPath(); ctx.roundRect(56, 712, 60, 3, 2); ctx.fill();
-
-    // Hook
-    const hook = g.hook || '';
-    const hSize = hook.length > 50 ? 62 : hook.length > 30 ? 76 : 90;
-    ctx.fillStyle = '#fff';
-    ctx.font = `bold ${hSize}px "Playfair Display",serif`;
-    const hookEnd = wrapText(ctx, hook, 56, 772, 970, hSize, 3);
-
-    // Subhook
-    ctx.fillStyle = 'rgba(255,255,255,.82)';
-    ctx.font = '300 26px Inter,sans-serif';
-    const subEnd = wrapText(ctx, g.subhook || '', 56, hookEnd + 16, 740, 38, 2);
-
-    // CTA pill
-    const ctaY = Math.min(subEnd + 22, 978);
-    ctx.fillStyle = '#D1BB74';
-    ctx.beginPath(); ctx.roundRect(56, ctaY, 470, 62, 31); ctx.fill();
-    ctx.fillStyle = '#011836';
-    ctx.font = 'bold 24px Inter,sans-serif';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('Call or text  (801) 784-0095', 88, ctaY + 31);
-
-    // Gold footer stripe
-    ctx.fillStyle = '#C9A84C'; ctx.fillRect(0, 1074, 1080, 6);
-
-    return canvas.toDataURL('image/png');
   }
 
   function editField(field: string, val: string) {
@@ -1101,6 +1040,12 @@ export default function Studio({ projects, current, generating, onSelect, onUpda
 
   return (
     <div className="ed-layout">
+      {/* Export canvas — parked just above viewport so browser keeps it painted */}
+      <div id="export-wrapper" style={{ position: 'fixed', top: -1082, left: 0, pointerEvents: 'none', zIndex: -1 }}>
+        <div id="export-canvas" style={{ width: 1080, height: 1080, position: 'relative' }}>
+          <GraphicCanvas tpl={current.template} content={current.graphic} img={img} imgPos={imgPos} />
+        </div>
+      </div>
       <input ref={fileRef} type="file" accept="image/*" hidden onChange={onFile} />
 
       <LeftPanel
