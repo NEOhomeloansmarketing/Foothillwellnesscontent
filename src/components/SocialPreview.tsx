@@ -2,18 +2,17 @@
 import { useState } from 'react';
 import Icon from './ui/Icon';
 
-const ZAPIER_WEBHOOK = 'https://hooks.zapier.com/hooks/catch/14659614/43606p9/';
-
 interface Props {
   imageUrl: string;
   caption: string;
   hashtags: string[];
   service: string;
+  webhookUrl: string;
   onPosted: () => void;
   onClose: () => void;
 }
 
-export default function SocialPreview({ imageUrl, caption, hashtags, service, onPosted, onClose }: Props) {
+export default function SocialPreview({ imageUrl, caption, hashtags, service, webhookUrl, onPosted, onClose }: Props) {
   const [posting, setPosting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fullCaption = caption + '\n\n' + hashtags.join(' ');
@@ -26,7 +25,7 @@ export default function SocialPreview({ imageUrl, caption, hashtags, service, on
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          webhookUrl: ZAPIER_WEBHOOK,
+          webhookUrl,
           payload: {
             imageUrl,
             caption,

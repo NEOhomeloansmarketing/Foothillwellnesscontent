@@ -291,9 +291,11 @@ interface CanvasProps {
   onUpdate: (p: ContentPiece) => void;
   onToast: (msg: string) => void;
   onSave: (p: ContentPiece) => void;
+  webhookUrl?: string;
+  onWebhookChange?: (url: string) => void;
 }
 
-function CanvasPanel({ current, img, imgPos, onImgPos, onEditField, onUpdate, onToast, onSave }: CanvasProps) {
+function CanvasPanel({ current, img, imgPos, onImgPos, onEditField, onUpdate, onToast, onSave, webhookUrl, onWebhookChange }: CanvasProps) {
   const [showCaption, setShowCaption] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [selectedOverlay, setSelectedOverlay] = useState<string | null>(null);
@@ -320,14 +322,31 @@ function CanvasPanel({ current, img, imgPos, onImgPos, onEditField, onUpdate, on
       if (imgSrc) {
         await new Promise<void>(resolve => {
           const el = document.createElement('img');
+          el.crossOrigin = 'anonymous';
           el.onload = () => {
-            const scale = Math.max(SIZE / el.naturalWidth, SIZE / el.naturalHeight);
-            const sw = el.naturalWidth * scale;
-            const sh = el.naturalHeight * scale;
-            ctx.drawImage(el, (SIZE - sw) * (imgPos.x / 100), (SIZE - sh) * (imgPos.y / 100), sw, sh);
+            try {
+              const scale = Math.max(SIZE / el.naturalWidth, SIZE / el.naturalHeight);
+              const sw = el.naturalWidth * scale;
+              const sh = el.naturalHeight * scale;
+              ctx.drawImage(el, (SIZE - sw) * (imgPos.x / 100), (SIZE - sh) * (imgPos.y / 100), sw, sh);
+            } catch { /* tainted canvas — draw without image */ }
             resolve();
           };
-          el.onerror = () => resolve();
+          el.onerror = () => {
+            // CORS blocked or URL expired — try without crossOrigin as last resort
+            const el2 = document.createElement('img');
+            el2.onload = () => {
+              try {
+                const scale = Math.max(SIZE / el2.naturalWidth, SIZE / el2.naturalHeight);
+                const sw = el2.naturalWidth * scale;
+                const sh = el2.naturalHeight * scale;
+                ctx.drawImage(el2, (SIZE - sw) * (imgPos.x / 100), (SIZE - sh) * (imgPos.y / 100), sw, sh);
+              } catch { /* still tainted */ }
+              resolve();
+            };
+            el2.onerror = () => resolve();
+            el2.src = imgSrc;
+          };
           el.src = imgSrc;
         });
       } else {
@@ -703,21 +722,25 @@ function CanvasPanel({ current, img, imgPos, onImgPos, onEditField, onUpdate, on
       </div>
 
       {/* Publish bar */}
-      <PublishBar current={current} captureFrame={captureFrame} onSave={onSave} onToast={onToast} />
+      <PublishBar current={current} captureFrame={captureFrame} onSave={onSave} onToast={onToast} webhookUrl={webhookUrl} onWebhookChange={onWebhookChange} />
     </div>
   );
 }
 
 // ─── Publish bar ─────────────────────────────────────────────────────────────
-function PublishBar({ current, captureFrame, onSave, onToast }: {
+function PublishBar({ current, captureFrame, onSave, onToast, webhookUrl, onWebhookChange }: {
   current: ContentPiece;
   captureFrame: () => Promise<string | null>;
   onSave: (p: ContentPiece) => void;
   onToast: (msg: string) => void;
+  webhookUrl?: string;
+  onWebhookChange?: (url: string) => void;
 }) {
   const [stage, setStage] = useState<'idle' | 'capturing' | 'uploading' | 'preview'>('idle');
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [editingWebhook, setEditingWebhook] = useState(false);
+  const [webhookDraft, setWebhookDraft] = useState('');
 
   async function handlePrepare() {
     setStage('capturing');
@@ -748,17 +771,60 @@ function PublishBar({ current, captureFrame, onSave, onToast }: {
 
   const busy = stage === 'capturing' || stage === 'uploading';
   const label = stage === 'capturing' ? 'Exporting graphic…' : stage === 'uploading' ? 'Uploading image…' : 'Post to Social';
+  const hasWebhook = !!webhookUrl;
 
   return (
     <>
-      <div className="ed-publish" style={{ padding: '14px 20px' }}>
+      <div className="ed-publish" style={{ padding: '14px 20px 12px' }}>
         {error && (
           <div style={{ fontSize: 11.5, color: '#dc2626', marginBottom: 8, background: '#fef2f2', borderRadius: 8, padding: '7px 10px', lineHeight: 1.4 }}>
             {error}
           </div>
         )}
+
+        {/* Zapier webhook config */}
+        {editingWebhook ? (
+          <div style={{ marginBottom: 10 }}>
+            <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 5, fontWeight: 600, letterSpacing: '.05em', textTransform: 'uppercase' }}>
+              Zapier Webhook URL
+            </div>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <input
+                value={webhookDraft}
+                onChange={e => setWebhookDraft(e.target.value)}
+                placeholder="https://hooks.zapier.com/hooks/catch/..."
+                style={{ flex: 1, fontSize: 11.5, padding: '8px 10px', border: '1.5px solid var(--line)', borderRadius: 8, outline: 'none', color: 'var(--navy-deep)' }}
+                autoFocus
+              />
+              <button
+                onClick={() => { onWebhookChange?.(webhookDraft.trim()); setEditingWebhook(false); onToast('Webhook saved'); }}
+                style={{ background: 'var(--navy-deep)', color: 'var(--gold-cta)', border: 'none', borderRadius: 8, padding: '8px 14px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+                Save
+              </button>
+              <button onClick={() => setEditingWebhook(false)} style={{ background: 'var(--line-soft)', color: 'var(--muted)', border: 'none', borderRadius: 8, padding: '8px 10px', fontSize: 12, cursor: 'pointer' }}>✕</button>
+            </div>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+              <div style={{ width: 7, height: 7, borderRadius: '50%', background: hasWebhook ? '#22c55e' : '#f59e0b' }} />
+              <span style={{ fontSize: 11, color: 'var(--muted)' }}>
+                {hasWebhook ? 'Zapier connected' : 'No Zapier webhook set'}
+              </span>
+            </div>
+            <button
+              onClick={() => { setWebhookDraft(webhookUrl || ''); setEditingWebhook(true); }}
+              style={{ fontSize: 11, color: '#2563eb', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline', padding: 0 }}>
+              {hasWebhook ? 'Update' : 'Configure'}
+            </button>
+          </div>
+        )}
+
         <button
-          onClick={handlePrepare}
+          onClick={() => {
+            if (!hasWebhook) { setEditingWebhook(true); setWebhookDraft(''); onToast('Paste your Zapier webhook URL first'); return; }
+            handlePrepare();
+          }}
           disabled={busy}
           style={{
             width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
@@ -778,6 +844,7 @@ function PublishBar({ current, captureFrame, onSave, onToast }: {
           caption={current.caption}
           hashtags={current.hashtags}
           service={current.service}
+          webhookUrl={webhookUrl!}
           onClose={() => { setStage('idle'); setImageUrl(null); }}
           onPosted={() => {
             setStage('idle');
@@ -1083,6 +1150,7 @@ export default function Studio({ projects, current, generating, onSelect, onUpda
   const [showReviewPicker, setShowReviewPicker] = useState(false);
   const fileRef = useRef<HTMLInputElement | null>(null);
   const webhooks = useStore(s => s.webhooks);
+  const setWebhooks = useStore(s => s.setWebhooks);
 
   useEffect(() => {
     // When the project switches, always reset position
@@ -1158,6 +1226,8 @@ export default function Studio({ projects, current, generating, onSelect, onUpda
       <CanvasPanel
         current={current} img={img} imgPos={imgPos} onImgPos={setImgPos}
         onEditField={editField} onUpdate={onUpdate} onToast={onToast} onSave={onSave}
+        webhookUrl={webhooks.instagram}
+        onWebhookChange={url => setWebhooks({ instagram: url })}
       />
 
       <RightPanel
