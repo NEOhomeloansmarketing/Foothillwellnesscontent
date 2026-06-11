@@ -9,6 +9,46 @@ interface Props {
   onToast: (msg: string) => void;
 }
 
+function buildHtml(ec: EmailContent): string {
+  return `<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#F0EDE6;font-family:Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#F0EDE6;padding:32px 16px;">
+  <tr><td align="center">
+    <table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;">
+      <tr><td style="background:#011836;padding:24px 40px;text-align:center;">
+        <div style="font-family:Georgia,serif;font-size:22px;font-weight:800;color:#C9A84C;">Foothill Wellness</div>
+        <div style="font-size:11px;color:rgba(201,168,76,.65);margin-top:3px;letter-spacing:.12em;text-transform:uppercase;">Feel Better Faster</div>
+      </td></tr>
+      <tr><td style="padding:32px 40px 24px;color:#1a2540;">
+        <p style="font-size:15px;line-height:1.75;margin:0 0 4px;font-weight:600;">Hello {{contact.first_name}},</p>
+        <p style="font-size:15px;line-height:1.75;margin:0 0 18px;">${ec.opening.replace(/\n/g, '<br>')}</p>
+        <p style="font-size:15px;line-height:1.75;color:#3a4a6a;margin:0 0 20px;">${ec.empathy.replace(/\n/g, '<br>')}</p>
+        <div style="border-left:3px solid #C9A84C;border-radius:0 8px 8px 0;background:#FAF8F3;padding:14px 18px;margin-bottom:20px;">
+          <p style="font-size:14.5px;line-height:1.7;color:#1a2540;margin:0;">${ec.explanation.replace(/\n/g, '<br>')}</p>
+        </div>
+        <div style="background:#FAF8F3;border-radius:10px;padding:16px 20px;margin-bottom:20px;border-top:2px solid #C9A84C;">
+          <p style="font-family:Georgia,serif;font-style:italic;font-size:14.5px;line-height:1.65;color:#011836;margin:0;">${ec.proof.replace(/\n/g, '<br>')}</p>
+        </div>
+        <p style="font-size:15px;line-height:1.75;color:#1a2540;margin:0 0 18px;">${ec.speed.replace(/\n/g, '<br>')}</p>
+        <p style="font-size:15px;line-height:1.75;color:#3a4a6a;margin:0 0 22px;">${ec.ease.replace(/\n/g, '<br>')}</p>
+        <div style="background:#011836;border-radius:10px;padding:16px 22px;margin-bottom:22px;text-align:center;">
+          <p style="color:#C9A84C;font-weight:700;font-size:15px;margin:0;">${ec.cta}</p>
+        </div>
+        <p style="font-size:14px;line-height:1.7;color:#3a4a6a;margin:0 0 16px;white-space:pre-line;">${ec.closing}</p>
+        ${ec.ps ? `<hr style="border:none;border-top:1px solid #e8e4da;margin:18px 0 14px;"><p style="font-size:13px;line-height:1.6;color:#6b7a99;font-style:italic;margin:0;">P.S. ${ec.ps}</p>` : ''}
+      </td></tr>
+      <tr><td style="background:#011836;padding:14px 40px;text-align:center;">
+        <p style="font-size:11px;color:rgba(201,168,76,.55);margin:0;">Foothill Wellness · 1414 S Foothill Dr, Salt Lake City, UT 84108</p>
+        <p style="font-size:10px;color:rgba(201,168,76,.35);margin:4px 0 0;">{{contact.unsubscribe_link}}</p>
+      </td></tr>
+    </table>
+  </td></tr>
+</table>
+</body></html>`;
+}
+
 function assembleFullEmail(ec: EmailContent): string {
   const lines = [
     `Subject: ${ec.subject}`,
@@ -82,7 +122,6 @@ export default function EmailEditor({ current, onUpdate, onToast }: Props) {
   const [aiDraft, setAiDraft] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
   const [aiHistory, setAiHistory] = useState<{ role: 'user' | 'ai'; text: string }[]>([]);
-  const [ghlSending, setGhlSending] = useState(false);
   const feedRef = useRef<HTMLDivElement>(null);
 
   const ec = current.emailContent ?? {
@@ -110,27 +149,6 @@ export default function EmailEditor({ current, onUpdate, onToast }: Props) {
     const proofLine = `"${trimmed}" — ${review.name}`;
     update('proof', proofLine);
     onToast(`Review updated — ${review.name}`);
-  }
-
-  async function sendToGHL() {
-    if (ghlSending) return;
-    setGhlSending(true);
-    try {
-      const res = await fetch('/api/ghl-campaign', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: ec, title: current.title }),
-      });
-      const json = await res.json();
-      if (json.ok) {
-        onToast('Email template created in GHL — open Email Marketing to send it');
-      } else {
-        onToast(`GHL error: ${json.error ?? 'Unknown error'}`);
-      }
-    } catch {
-      onToast('Network error — could not reach GHL');
-    }
-    setGhlSending(false);
   }
 
   async function sendAI() {
@@ -296,21 +314,12 @@ export default function EmailEditor({ current, onUpdate, onToast }: Props) {
               Copy
             </button>
             <button
-              onClick={sendToGHL}
-              disabled={ghlSending || isLoading}
-              title="Create template in Go High Level"
-              style={{
-                fontSize: 11, fontWeight: 700, flexShrink: 0,
-                color: ghlSending || isLoading ? 'var(--muted)' : '#fff',
-                background: ghlSending || isLoading ? 'var(--line-soft)' : 'var(--navy-deep)',
-                border: 'none', borderRadius: 7, padding: '6px 10px',
-                cursor: ghlSending || isLoading ? 'not-allowed' : 'pointer',
-                display: 'flex', alignItems: 'center', gap: 5,
-              }}
+              onClick={() => { navigator.clipboard?.writeText(buildHtml(ec)); onToast('HTML copied — paste into GHL email builder'); }}
+              disabled={isLoading}
+              title="Copy full HTML to paste into GHL email builder"
+              style={{ fontSize: 11, fontWeight: 700, color: '#fff', background: 'var(--navy-deep)', border: 'none', borderRadius: 7, padding: '6px 10px', cursor: isLoading ? 'not-allowed' : 'pointer', flexShrink: 0 }}
             >
-              {ghlSending
-                ? <><div className="spin" style={{ width: 12, height: 12, borderWidth: 2 }} /> Sending…</>
-                : '↑ Send to GHL'}
+              Copy HTML
             </button>
           </div>
         </div>
