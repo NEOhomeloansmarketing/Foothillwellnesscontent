@@ -21,9 +21,10 @@ function flatServices() {
 interface FlowProps {
   onClose: () => void;
   onGenerate: (opts: GenerateOptions & { userImage?: string | null }) => void;
+  contentType?: string;
 }
 
-export default function Flow({ onClose, onGenerate }: FlowProps) {
+export default function Flow({ onClose, onGenerate, contentType = 'ig-post' }: FlowProps) {
   const [step, setStep] = useState(0);
   const [service, setService] = useState<{ cat: string; name: string } | null>(null);
   const [audience, setAudience] = useState<AudienceId | null>(null);
@@ -41,7 +42,7 @@ export default function Flow({ onClose, onGenerate }: FlowProps) {
 
   function next() {
     if (last) {
-      onGenerate({ contentType: 'ig-post', service: service!.name, audience: audience!, goal, notes, userImage: photo });
+      onGenerate({ contentType, service: service!.name, audience: audience!, goal, notes, userImage: photo });
     } else {
       setStep(step + 1);
     }
@@ -69,7 +70,7 @@ export default function Flow({ onClose, onGenerate }: FlowProps) {
 
         <div className="flow-body">
           {step === 0 && <>
-            <div className="eyebrow q-eyebrow">Instagram Post · Step 1 of 3</div>
+            <div className="eyebrow q-eyebrow">{contentType === 'email' ? 'Email Campaign · Step 1 of 3' : 'Instagram Post · Step 1 of 3'}</div>
             <h3 className="serif">Which service are we highlighting?</h3>
             <p className="q-sub">Pick the one treatment this piece should feature. We'll lead with the client's problem first — never the treatment menu.</p>
             <div className="svc-search">
@@ -121,17 +122,19 @@ export default function Flow({ onClose, onGenerate }: FlowProps) {
               <label>Tell the studio what you want <span style={{ textTransform: 'none', color: 'var(--muted)', fontWeight: 400 }}>(optional)</span></label>
               <textarea rows={3} placeholder="e.g. promote our buy-5-get-1 IV deal, feature Allie, keep it warm and local, lead with better sleep…" value={notes} onChange={e => setNotes(e.target.value)} />
             </div>
-            <div className="field" style={{ marginTop: 18 }}>
-              <label>Use your own photo <span style={{ textTransform: 'none', color: 'var(--muted)', fontWeight: 400 }}>(optional — otherwise we'll auto-pick one)</span></label>
-              <input ref={photoRef} type="file" accept="image/*" hidden onChange={onPhoto} />
-              {photo
-                ? <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: 12, border: '1.5px solid var(--line)', borderRadius: 12, background: '#fff' }}>
-                    <img src={photo} style={{ width: 60, height: 60, borderRadius: 9, objectFit: 'cover' }} alt="" />
-                    <div style={{ flex: 1 }}><div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--navy-mid)' }}>Photo ready</div><div style={{ fontSize: 12, color: 'var(--muted)' }}>The studio will place this in your graphic</div></div>
-                    <button className="btn btn-quiet" style={{ fontSize: 12 }} onClick={() => { setPhoto(null); if (photoRef.current) photoRef.current.value = ''; }}>Remove</button>
-                  </div>
-                : <button className="upl-btn" style={{ width: '100%', justifyContent: 'center', padding: '16px' }} onClick={() => photoRef.current?.click()}><Icon n="upload" size={17} /> Upload a photo to use</button>}
-            </div>
+            {contentType !== 'email' && (
+              <div className="field" style={{ marginTop: 18 }}>
+                <label>Use your own photo <span style={{ textTransform: 'none', color: 'var(--muted)', fontWeight: 400 }}>(optional — otherwise we'll auto-pick one)</span></label>
+                <input ref={photoRef} type="file" accept="image/*" hidden onChange={onPhoto} />
+                {photo
+                  ? <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: 12, border: '1.5px solid var(--line)', borderRadius: 12, background: '#fff' }}>
+                      <img src={photo} style={{ width: 60, height: 60, borderRadius: 9, objectFit: 'cover' }} alt="" />
+                      <div style={{ flex: 1 }}><div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--navy-mid)' }}>Photo ready</div><div style={{ fontSize: 12, color: 'var(--muted)' }}>The studio will place this in your graphic</div></div>
+                      <button className="btn btn-quiet" style={{ fontSize: 12 }} onClick={() => { setPhoto(null); if (photoRef.current) photoRef.current.value = ''; }}>Remove</button>
+                    </div>
+                  : <button className="upl-btn" style={{ width: '100%', justifyContent: 'center', padding: '16px' }} onClick={() => photoRef.current?.click()}><Icon n="upload" size={17} /> Upload a photo to use</button>}
+              </div>
+            )}
           </>}
         </div>
 

@@ -79,6 +79,21 @@ export interface ContentPiece {
   textOverlays?: TextOverlay[];
   textPositions?: Record<string, { x: number; y: number }>;
   postedAt?: number;       // unix ms when the post was sent to Zapier
+  emailContent?: EmailContent;
+}
+
+export interface EmailContent {
+  subject: string;
+  previewText: string;
+  opening: string;
+  empathy: string;
+  explanation: string;
+  proof: string;
+  speed: string;
+  ease: string;
+  cta: string;
+  closing: string;
+  ps?: string;
 }
 
 export interface ChatMessage {

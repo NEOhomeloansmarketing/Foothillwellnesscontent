@@ -8,6 +8,7 @@ import ReviewPicker from './ReviewPicker';
 import SocialPreview from './SocialPreview';
 import { AUD } from '@/lib/content';
 import { useStore } from '@/store';
+import EmailEditor from './EmailEditor';
 import type { ContentPiece, ChannelId, ChatMessage, FiveLaw, TextOverlay } from '@/types';
 import type { Webhooks } from '@/store';
 
@@ -1167,6 +1168,19 @@ export default function Studio({ projects, current, generating, onSelect, onUpda
       graphic: { ...current.graphic, quote: `"${trimmed}"`, proofName: review.name },
     });
     onToast(`Review updated — ${review.name}`);
+  }
+
+  if (current.contentType === 'email') {
+    return (
+      <div className="ed-layout">
+        <LeftPanel
+          projects={projects} current={current} onSelect={p => { onSelect(p); onUpdate(p); }} onPick={onPick}
+        />
+        <div style={{ gridColumn: '2 / -1', display: 'flex', overflow: 'hidden' }}>
+          <EmailEditor current={current} onUpdate={onUpdate} onToast={onToast} />
+        </div>
+      </div>
+    );
   }
 
   return (

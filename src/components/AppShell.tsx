@@ -1,5 +1,5 @@
 'use client';
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import Image from 'next/image';
 import Icon from './ui/Icon';
 import Btn from './ui/Btn';
@@ -10,7 +10,7 @@ import Calendar from './Calendar';
 import { useStore } from '@/store';
 import { bakedGenerate } from '@/lib/content';
 import { contentTypes } from '@/lib/brand';
-import type { ContentPiece, GenerateOptions } from '@/types';
+import type { ContentPiece, GenerateOptions, EmailContent } from '@/types';
 
 export default function AppShell() {
   const {
@@ -19,6 +19,7 @@ export default function AppShell() {
     updateCurrent, updateProject, addProject,
   } = useStore();
 
+  const [emailFlowOpen, setEmailFlowOpen] = useState(false);
   const toastT = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   function showToast(msg: string) {
@@ -29,6 +30,7 @@ export default function AppShell() {
 
   function pick(type: string) {
     if (type === 'library') { if (!current && projects.length) setCurrent(projects[0]); setView('studio'); return; }
+    if (type === 'email') { setEmailFlowOpen(true); return; }
     if (type !== 'ig-post') {
       const ct = contentTypes.find(t => t.id === type);
       showToast((ct?.label || type) + ' is coming soon — Instagram Post is ready now');
@@ -113,6 +115,70 @@ export default function AppShell() {
     }
   }
 
+  async function runGenerateEmail(opts: GenerateOptions) {
+    setEmailFlowOpen(false);
+    setView('studio');
+    setGenerating(true);
+    setCurrent(null);
+
+    const audienceShort: Record<string, string> = { pain: 'Pain', healing: 'Recovery', weight: 'Weight', energy: 'Energy' };
+    const projId = 'p' + Math.random().toString(36).slice(2, 8);
+
+    const placeholderEmail: EmailContent = {
+      subject: 'Writing your email…',
+      previewText: '',
+      opening: '',
+      empathy: '',
+      explanation: '',
+      proof: '',
+      speed: '',
+      ease: '',
+      cta: 'Call or text (801) 784-0095',
+      closing: 'Foothill Wellness Team',
+    };
+
+    const proj: ContentPiece = {
+      id: projId,
+      createdAt: Date.now(),
+      channels: [],
+      status: 'draft',
+      contentType: 'email',
+      title: `${opts.service} · Email · ${audienceShort[opts.audience] ?? opts.audience}`,
+      service: opts.service,
+      audience: opts.audience,
+      goal: opts.goal,
+      template: 'educate',
+      graphic: { eyebrow: '', hook: '', emphasis: '', subhook: '', ctaShort: '', quote: '', proofName: '', proofMeta: '', title: '', tagline: '', problemHook: '', problemEmphasis: '', problemDesc: '', aspiration: '', benefits: [], speed: '' },
+      caption: '',
+      hashtags: [],
+      fiveLaws: [],
+      autoImage: null,
+      imgKeywords: '',
+      altHooks: [],
+      proofUsed: '',
+      emailContent: placeholderEmail,
+    };
+
+    addProject(proj);
+    setGenerating(false);
+
+    try {
+      const res = await fetch('/api/generate-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ service: opts.service, audience: opts.audience, goal: opts.goal, notes: opts.notes }),
+      });
+      const json = await res.json();
+      if (json.ok && json.data) {
+        updateProject({ ...proj, emailContent: json.data as EmailContent });
+      } else {
+        showToast('Email generation failed — try again');
+      }
+    } catch {
+      showToast('Network error generating email');
+    }
+  }
+
   function openProject(p: ContentPiece) {
     setCurrent(p);
     setView('studio');
@@ -153,6 +219,7 @@ export default function AppShell() {
       )}
 
       {flowOpen && <Flow onClose={() => setFlowOpen(false)} onGenerate={runGenerate} />}
+      {emailFlowOpen && <Flow contentType="email" onClose={() => setEmailFlowOpen(false)} onGenerate={runGenerateEmail} />}
 
       {postSuccess && (
         <div style={{

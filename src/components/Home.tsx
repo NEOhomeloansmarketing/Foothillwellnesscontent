@@ -70,7 +70,7 @@ export default function Home({ projects, onPick, onOpen }: HomeProps) {
               <div className="type-grid">
                 {list.map(t => (
                   <button key={t.id} className={`type-card ${t.id === 'ig-post' ? 'feat' : ''}`} onClick={() => onPick(t.id)}>
-                    <span className="grp">{t.id === 'ig-post' ? 'Ready' : 'Soon'}</span>
+                    <span className="grp">{(t.id === 'ig-post' || t.id === 'email') ? 'Ready' : 'Soon'}</span>
                     <div className="ic"><Icon n={iconFor[t.id] || 'grid'} size={22} /></div>
                     <h3>{t.label}</h3>
                     <div className="desc">{t.desc}</div>
