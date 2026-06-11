@@ -978,27 +978,31 @@ export default function Studio({ projects, current, generating, onSelect, onUpda
     const ctx = canvas.getContext('2d');
     if (!ctx) return null;
 
-    await document.fonts.ready;
+    // Wait for fonts — 2 s max so a slow CDN never blocks us
+    await Promise.race([document.fonts.ready, new Promise(r => setTimeout(r, 2000))]);
 
     // Background
     ctx.fillStyle = '#011836';
     ctx.fillRect(0, 0, 1080, 1080);
 
-    // Photo
+    // Photo — 4 s max in case the data URL is huge
     if (firstImg) {
-      await new Promise<void>(res => {
-        const photo = new Image();
-        photo.onload = () => {
-          const ar = photo.naturalWidth / photo.naturalHeight;
-          let sx = 0, sy = 0, sw = photo.naturalWidth, sh = photo.naturalHeight;
-          if (ar > 1) { sw = sh; sx = (photo.naturalWidth - sw) / 2; }
-          else { sh = sw; sy = (photo.naturalHeight - sh) / 2; }
-          ctx.drawImage(photo, sx, sy, sw, sh, 0, 0, 1080, 1080);
-          res();
-        };
-        photo.onerror = () => res();
-        photo.src = firstImg;
-      });
+      await Promise.race([
+        new Promise<void>(res => {
+          const photo = new Image();
+          photo.onload = () => {
+            const ar = photo.naturalWidth / photo.naturalHeight;
+            let sx = 0, sy = 0, sw = photo.naturalWidth, sh = photo.naturalHeight;
+            if (ar > 1) { sw = sh; sx = (photo.naturalWidth - sw) / 2; }
+            else { sh = sw; sy = (photo.naturalHeight - sh) / 2; }
+            ctx.drawImage(photo, sx, sy, sw, sh, 0, 0, 1080, 1080);
+            res();
+          };
+          photo.onerror = () => res();
+          photo.src = firstImg;
+        }),
+        new Promise<void>(r => setTimeout(r, 4000)),
+      ]);
     }
 
     // Gradient
