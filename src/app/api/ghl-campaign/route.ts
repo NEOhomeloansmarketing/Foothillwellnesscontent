@@ -87,13 +87,17 @@ export async function POST(req: NextRequest) {
       body: JSON.stringify(body),
     });
 
-    const data = await res.json();
+    const raw = await res.text();
+    console.log('[ghl-campaign] status:', res.status, 'body:', raw.slice(0, 500));
+
+    let data: Record<string, unknown> = {};
+    try { data = JSON.parse(raw); } catch { /* non-JSON response */ }
 
     if (!res.ok) {
-      return NextResponse.json({ ok: false, error: data?.message || `GHL returned ${res.status}`, raw: data }, { status: 502 });
+      return NextResponse.json({ ok: false, error: data?.message || raw.slice(0, 200) || `GHL returned ${res.status}`, status: res.status }, { status: 502 });
     }
 
-    return NextResponse.json({ ok: true, campaignId: data.id ?? data.campaign?.id, data });
+    return NextResponse.json({ ok: true, campaignId: data.id ?? (data.campaign as Record<string, unknown>)?.id, data });
   } catch (e) {
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
   }
