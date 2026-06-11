@@ -680,12 +680,9 @@ function PublishBar({ current, captureFrame, onSave, onToast, webhookUrl, onWebh
           </div>
         )}
 
-        {/* Zapier webhook config */}
+        {/* Social connection config */}
         {editingWebhook ? (
           <div style={{ marginBottom: 10 }}>
-            <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 5, fontWeight: 600, letterSpacing: '.05em', textTransform: 'uppercase' }}>
-              Zapier Webhook URL
-            </div>
             <div style={{ display: 'flex', gap: 6 }}>
               <input
                 value={webhookDraft}
@@ -695,7 +692,7 @@ function PublishBar({ current, captureFrame, onSave, onToast, webhookUrl, onWebh
                 autoFocus
               />
               <button
-                onClick={() => { onWebhookChange?.(webhookDraft.trim()); setEditingWebhook(false); onToast('Webhook saved'); }}
+                onClick={() => { onWebhookChange?.(webhookDraft.trim()); setEditingWebhook(false); onToast('Socials updated'); }}
                 style={{ background: 'var(--navy-deep)', color: 'var(--gold-cta)', border: 'none', borderRadius: 8, padding: '8px 14px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
                 Save
               </button>
@@ -703,17 +700,11 @@ function PublishBar({ current, captureFrame, onSave, onToast, webhookUrl, onWebh
             </div>
           </div>
         ) : (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-              <div style={{ width: 7, height: 7, borderRadius: '50%', background: hasWebhook ? '#22c55e' : '#f59e0b' }} />
-              <span style={{ fontSize: 11, color: 'var(--muted)' }}>
-                {hasWebhook ? 'Zapier connected' : 'No Zapier webhook set'}
-              </span>
-            </div>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
             <button
               onClick={() => { setWebhookDraft(webhookUrl || ''); setEditingWebhook(true); }}
-              style={{ fontSize: 11, color: '#2563eb', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline', padding: 0 }}>
-              {hasWebhook ? 'Update' : 'Configure'}
+              style={{ fontSize: 11, color: 'var(--muted)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline', padding: 0 }}>
+              {hasWebhook ? 'Socials connected · Update' : 'Connect socials'}
             </button>
           </div>
         )}
