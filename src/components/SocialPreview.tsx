@@ -28,35 +28,27 @@ export default function SocialPreview({ imageUrl, caption, hashtags, service, we
   const hashtagLine = hashtags.join(' ');
   const fullCaption = cleanCaption + (hashtagLine ? '\n\n' + hashtagLine : '');
 
-  async function handlePost() {
+  function handlePost() {
     setPosting(true);
-    setError(null);
-    try {
-      const res = await fetch('/api/webhook', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          webhookUrl,
-          payload: {
-            imageUrl,
-            caption: fullCaption,
-            hashtags: hashtagLine,
-            fullCaption,
-            service,
-            platform: 'instagram',
-            timestamp: new Date().toISOString(),
-          },
-        }),
-      });
-      const data = await res.json();
-      if (!data.ok) throw new Error(data.error || `Zapier returned ${data.status}: ${data.body}`);
-
-      // Parent closes modal, shows toast, saves project, and navigates
-      onPosted();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to send — check your Zapier webhook');
-      setPosting(false);
-    }
+    // Fire to Zapier in the background — don't wait on the response
+    fetch('/api/webhook', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        webhookUrl,
+        payload: {
+          imageUrl,
+          caption: fullCaption,
+          hashtags: hashtagLine,
+          fullCaption,
+          service,
+          platform: 'instagram',
+          timestamp: new Date().toISOString(),
+        },
+      }),
+    }).catch(() => {});
+    // Success immediately — Zapier delivery is best-effort
+    onPosted();
   }
 
   return (
