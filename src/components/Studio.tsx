@@ -293,9 +293,10 @@ interface CanvasProps {
   onSave: (p: ContentPiece) => void;
   webhookUrl?: string;
   onWebhookChange?: (url: string) => void;
+  onPosted?: (p: ContentPiece) => void;
 }
 
-function CanvasPanel({ current, img, imgPos, onImgPos, onEditField, onUpdate, onToast, onSave, webhookUrl, onWebhookChange }: CanvasProps) {
+function CanvasPanel({ current, img, imgPos, onImgPos, onEditField, onUpdate, onToast, onSave, webhookUrl, onWebhookChange, onPosted }: CanvasProps) {
   const [showCaption, setShowCaption] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [selectedOverlay, setSelectedOverlay] = useState<string | null>(null);
@@ -638,21 +639,22 @@ function CanvasPanel({ current, img, imgPos, onImgPos, onEditField, onUpdate, on
       </div>
 
       {/* Publish bar */}
-      <PublishBar current={current} captureFrame={captureFrame} onSave={onSave} onToast={onToast} webhookUrl={webhookUrl} onWebhookChange={onWebhookChange} />
+      <PublishBar current={current} captureFrame={captureFrame} onSave={onSave} onToast={onToast} webhookUrl={webhookUrl} onWebhookChange={onWebhookChange} onPosted={onPosted} />
     </div>
   );
 }
 
 // ─── Publish bar ─────────────────────────────────────────────────────────────
-function PublishBar({ current, captureFrame, onSave, onToast, webhookUrl, onWebhookChange }: {
+function PublishBar({ current, captureFrame, onSave, onToast, webhookUrl, onWebhookChange, onPosted }: {
   current: ContentPiece;
   captureFrame: () => Promise<string | null>;
   onSave: (p: ContentPiece) => void;
   onToast: (msg: string) => void;
   webhookUrl?: string;
   onWebhookChange?: (url: string) => void;
+  onPosted?: (p: ContentPiece) => void;
 }) {
-  const setView = useStore(s => s.setView);
+
   const [stage, setStage] = useState<'idle' | 'capturing' | 'uploading' | 'preview'>('idle');
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -754,11 +756,11 @@ function PublishBar({ current, captureFrame, onSave, onToast, webhookUrl, onWebh
           webhookUrl={webhookUrl || 'https://hooks.zapier.com/hooks/catch/14659614/43606p9/'}
           onClose={() => { setStage('idle'); setImageUrl(null); }}
           onPosted={() => {
+            const posted = { ...current, channels: ['instagram', 'google'], status: 'posted', postedAt: Date.now() } as ContentPiece;
             setStage('idle');
             setImageUrl(null);
-            onSave({ ...current, channels: ['instagram', 'google'], status: 'posted', postedAt: Date.now() });
-            onToast('🎉 Posted to Instagram!');
-            setTimeout(() => setView('calendar'), 400);
+            onSave(posted);
+            onPosted?.(posted);
           }}
         />
       )}
@@ -1049,9 +1051,10 @@ interface StudioProps {
   projects: ContentPiece[]; current: ContentPiece | null; generating: boolean;
   onSelect: (p: ContentPiece) => void; onUpdate: (p: ContentPiece) => void;
   onSave: (p: ContentPiece) => void; onPick: (type: string) => void; onToast: (msg: string) => void;
+  onPosted?: (p: ContentPiece) => void;
 }
 
-export default function Studio({ projects, current, generating, onSelect, onUpdate, onSave, onPick, onToast }: StudioProps) {
+export default function Studio({ projects, current, generating, onSelect, onUpdate, onSave, onPick, onToast, onPosted }: StudioProps) {
   const [img, setImg] = useState<string | string[] | null>(null);
   const [imgPos, setImgPos] = useState({ x: 50, y: 35 });
   const [chans, setChans] = useState<ChannelId[]>(['instagram']);
@@ -1144,6 +1147,7 @@ export default function Studio({ projects, current, generating, onSelect, onUpda
         onEditField={editField} onUpdate={onUpdate} onToast={onToast} onSave={onSave}
         webhookUrl={webhooks.instagram}
         onWebhookChange={url => setWebhooks({ instagram: url })}
+        onPosted={onPosted}
       />
 
       <RightPanel

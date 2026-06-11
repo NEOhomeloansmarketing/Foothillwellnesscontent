@@ -1,5 +1,5 @@
 'use client';
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import Image from 'next/image';
 import Icon from './ui/Icon';
 import Btn from './ui/Btn';
@@ -20,6 +20,7 @@ export default function AppShell() {
   } = useStore();
 
   const toastT = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const [postSuccess, setPostSuccess] = useState(false);
 
   function showToast(msg: string) {
     setToast(msg);
@@ -148,10 +149,49 @@ export default function AppShell() {
           onSave={updateCurrent}
           onPick={pick}
           onToast={showToast}
+          onPosted={(p) => { updateCurrent(p); setPostSuccess(true); }}
         />
       )}
 
       {flowOpen && <Flow onClose={() => setFlowOpen(false)} onGenerate={runGenerate} />}
+
+      {postSuccess && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 999,
+          background: 'rgba(1,24,54,0.92)', backdropFilter: 'blur(8px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <div style={{
+            background: '#fff', borderRadius: 28, padding: '56px 72px',
+            textAlign: 'center', boxShadow: '0 40px 120px rgba(1,24,54,0.5)',
+            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20,
+            maxWidth: 480, width: '100%',
+          }}>
+            <div style={{
+              width: 80, height: 80, borderRadius: '50%', background: '#dcfce7',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <Icon n="check" size={40} style={{ color: '#16a34a' }} />
+            </div>
+            <div style={{ fontFamily: "'Playfair Display',serif", fontSize: 30, fontWeight: 800, color: 'var(--navy-deep)', lineHeight: 1.2 }}>
+              Posted to Instagram!
+            </div>
+            <div style={{ fontSize: 15, color: 'var(--muted)', lineHeight: 1.6 }}>
+              Your post is on its way to Instagram via Zapier.
+            </div>
+            <button
+              onClick={() => { setPostSuccess(false); setView('home'); }}
+              style={{
+                marginTop: 8, background: 'var(--navy-deep)', color: 'var(--gold-cta)',
+                border: 'none', borderRadius: 14, padding: '16px 40px',
+                fontSize: 16, fontWeight: 800, cursor: 'pointer', letterSpacing: '.04em',
+              }}
+            >
+              Back to Home
+            </button>
+          </div>
+        </div>
+      )}
 
       {toast && (
         <div className="toast">
